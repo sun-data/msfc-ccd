@@ -8,15 +8,6 @@ from . import test_images
 class AbstractTestAbstractTapImage(
     test_images.AbstractTestAbstractImageData,
 ):
-    def test_axis_tap_x(self, a: msfc_ccd.abc.AbstractTapData):
-        result = a.axis_tap_x
-        assert isinstance(result, str)
-        assert result in a.outputs.shape
-
-    def test_axis_tap_y(self, a: msfc_ccd.abc.AbstractTapData):
-        result = a.axis_tap_y
-        assert isinstance(result, str)
-        assert result in a.outputs.shape
 
     def test_tap(self, a: msfc_ccd.abc.AbstractTapData):
         result = a.tap
@@ -39,9 +30,11 @@ class AbstractTestAbstractTapImage(
 
     def test_bias(self, a: msfc_ccd.abc.AbstractTapData):
         result = a.bias()
+        axis_tap_x = a.camera.axis_tap_x
+        axis_tap_y = a.camera.axis_tap_y
         assert na.unit(result.outputs) == na.unit(a.outputs)
-        assert result.shape[a.axis_tap_x] == a.shape[a.axis_tap_x]
-        assert result.shape[a.axis_tap_y] == a.shape[a.axis_tap_y]
+        assert result.shape[axis_tap_x] == a.shape[axis_tap_x]
+        assert result.shape[axis_tap_y] == a.shape[axis_tap_y]
 
     def test_unbiased(self, a: msfc_ccd.abc.AbstractTapData):
         result = a.unbiased
@@ -61,7 +54,7 @@ class AbstractTestAbstractTapImage(
 @pytest.mark.parametrize(
     argnames="a",
     argvalues=[
-        msfc_ccd.fits.open(msfc_ccd.samples.path_dark_esis1).taps(),
+        msfc_ccd.fits.open(msfc_ccd.samples.path_dark_esis1).taps,
     ],
 )
 class TestTapImage(

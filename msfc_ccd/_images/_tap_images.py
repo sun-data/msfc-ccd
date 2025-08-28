@@ -18,20 +18,10 @@ class AbstractTapData(
     """An interface for representing data gathered by a single tap."""
 
     @property
-    @abc.abstractmethod
-    def axis_tap_x(self) -> str:
-        """The name of the horizontal tap axis."""
-
-    @property
-    @abc.abstractmethod
-    def axis_tap_y(self) -> str:
-        """The name of the vertical tap axis."""
-
-    @property
     def tap(self) -> dict[str, na.AbstractScalarArray]:
         """The 2-dimensional index of the tap corresponding to each image."""
-        axis_tap_x = self.axis_tap_x
-        axis_tap_y = self.axis_tap_y
+        axis_tap_x = self.camera.axis_tap_x
+        axis_tap_y = self.camera.axis_tap_y
         shape = self.outputs.shape
         shape_img = {
             axis_tap_x: shape[axis_tap_x],
@@ -42,8 +32,10 @@ class AbstractTapData(
     @property
     def label(self) -> na.ScalarArray:
         """Human-readable name of the tap used often for plotting."""
-        tap_x = self.tap["tap_x"].astype(str).astype(object)
-        tap_y = self.tap["tap_y"].astype(str)
+        axis_tap_x = self.camera.axis_tap_x
+        axis_tap_y = self.camera.axis_tap_y
+        tap_x = self.tap[axis_tap_x].astype(str).astype(object)
+        tap_y = self.tap[axis_tap_y].astype(str)
         return "tap (" + tap_x + ", " + tap_y + ")"
 
     def where_blank(
@@ -159,6 +151,10 @@ class AbstractTapData(
             outputs=self.outputs[slice_active],
         )
 
+    @property
+    def electrons(self) -> Self:
+        return self.camera.dn_to_electrons(self)
+
 
 @dataclasses.dataclass(eq=False, repr=False)
 class TapData(
@@ -227,9 +223,3 @@ class TapData(
 
     axis_y: str = dataclasses.field(default="detector_y", kw_only=True)
     """The name of the vertical axis."""
-
-    axis_tap_x: str = dataclasses.field(default="tap_x", kw_only=True)
-    """The name of the horizontal tap axis."""
-
-    axis_tap_y: str = dataclasses.field(default="tap_y", kw_only=True)
-    """The name of the vertical tap axis."""

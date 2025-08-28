@@ -56,3 +56,8 @@ class AbstractImageData(
     @abc.abstractmethod
     def active(self) -> Self:
         """A new copy of these images without the bias and overscan columns."""
+
+    @property
+    @abc.abstractmethod
+    def electrons(self) -> Self:
+        """A new copy of these images in units of electrons."""
