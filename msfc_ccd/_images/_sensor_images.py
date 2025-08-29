@@ -98,16 +98,10 @@ class SensorData(
         import named_arrays as na
         import msfc_ccd
 
-        # Define the x and y axes of the detector
-        axis_x = "detector_x"
-        axis_y = "detector_y"
-
         # Load the sample image
         image = msfc_ccd.SensorData.from_fits(
             path=msfc_ccd.samples.path_fe55_esis1,
             camera=msfc_ccd.Camera(),
-            axis_x=axis_x,
-            axis_y=axis_y,
         )
 
         # Display the sample image
@@ -116,8 +110,8 @@ class SensorData(
         )
         im = na.plt.imshow(
             image.outputs.value,
-            axis_x=axis_x,
-            axis_y=axis_y,
+            axis_x=image.axis_x,
+            axis_y=image.axis_y,
             ax=ax,
         );
     """

@@ -171,14 +171,6 @@ class TapData(
         import named_arrays as na
         import msfc_ccd
 
-        # Define the x and y axes of the detector
-        axis_x = "detector_x"
-        axis_y = "detector_y"
-
-        # Define the x and y axes of the taps
-        axis_tap_x = "tap_x"
-        axis_tap_y = "tap_y"
-
         # Load the sample image
         image = msfc_ccd.fits.open(
             path=msfc_ccd.samples.path_fe55_esis1,
@@ -187,7 +179,11 @@ class TapData(
         )
 
         # Split the sample image into four separate images for each tap
-        taps = image.taps(axis_tap_x, axis_tap_y)
+        taps = image.taps
+
+        # Store the names of the logical axes corresponding to changing tap
+        axis_tap_x = taps.camera.axis_tap_x
+        axis_tap_y = taps.camera.axis_tap_y
 
         # Display the four images
         fig, axs = na.plt.subplots(
