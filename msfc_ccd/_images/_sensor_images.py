@@ -340,7 +340,18 @@ class SensorData(
     @property
     def active(self) -> Self:
         taps = self.taps.active
-        return self.from_taps(taps)
+        result = self.from_taps(taps)
+
+        shape = result.outputs.shape
+        axis_x = result.axis_x
+        axis_y = result.axis_y
+
+        result.pixel = na.Cartesian2dVectorArray(
+            x=na.ScalarArrayRange(0, shape[axis_x], axis_x),
+            y=na.ScalarArrayRange(0, shape[axis_y], axis_y),
+        )
+
+        return result
 
     @property
     def electrons(self) -> Self:
