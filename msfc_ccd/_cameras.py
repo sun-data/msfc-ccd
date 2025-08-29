@@ -27,12 +27,12 @@ class AbstractCamera(
     @abc.abstractmethod
     def gain(self) -> u.Quantity | na.AbstractScalar:
         """The conversion factor between electrons and ADC counts."""
-        
+
     @property
     @abc.abstractmethod
     def axis_tap_x(self) -> str:
         """The name of the logical axis corresponding to changing horizontal tap."""
-        
+
     @property
     @abc.abstractmethod
     def axis_tap_y(self) -> str:
