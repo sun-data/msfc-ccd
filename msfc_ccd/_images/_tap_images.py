@@ -200,7 +200,7 @@ class TapData(
         axs = axs[{taps.axis_tap_y: slice(None, None, -1)}]
         na.plt.pcolormesh(
             taps.inputs.pixel,
-            C=taps.outputs,
+            C=taps.outputs.value,
             ax=axs,
         );
 
