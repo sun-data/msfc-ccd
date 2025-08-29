@@ -26,7 +26,6 @@ class AbstractTapData(
         """The name of the vertical tap axis."""
         return self.camera.axis_tap_y
 
-
     @property
     def tap(self) -> dict[str, na.AbstractScalarArray]:
         """The 2-dimensional index of the tap corresponding to each image."""
