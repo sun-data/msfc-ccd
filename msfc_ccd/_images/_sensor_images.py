@@ -274,6 +274,9 @@ class SensorData(
         """
         Create a new copy of this object by concatenating the data from `taps`.
 
+        This method does not concatenate the ``taps.inputs.pixel`` coordinates.
+        Instead, this method creates a new set of coordinates from the final shape.
+
         Parameters
         ----------
         taps
@@ -282,28 +285,11 @@ class SensorData(
         axis_x = taps.axis_x
         axis_y = taps.axis_y
 
-        cam = self.camera
-
-        axis_tap_x = cam.axis_tap_x
-        axis_tap_y = cam.axis_tap_y
-
-        x = taps.inputs.pixel.x
-        y = taps.inputs.pixel.y
-
-        x_left = x[{axis_tap_x: 0}]
-        x_right = x[{axis_tap_x: 1}]
-
-        y_left = y[{axis_tap_y: 0}]
-        y_right = y[{axis_tap_y: 1}]
+        axis_tap_x = taps.axis_tap_x
+        axis_tap_y = taps.axis_tap_y
 
         reverse_x = {axis_x: slice(None, None, -1)}
         reverse_y = {axis_y: slice(None, None, -1)}
-
-        x_right = x_right[reverse_x]
-        y_right = y_right[reverse_y]
-
-        x = na.concatenate([x_left, x_right], axis=axis_x)
-        y = na.concatenate([y_left, y_right], axis=axis_y)
 
         a = taps.outputs
         a_00 = a[{axis_tap_x: 0, axis_tap_y: 0}]
@@ -323,13 +309,18 @@ class SensorData(
             axis=axis_y,
         )
 
-        return dataclasses.replace(
-            self,
-            inputs=dataclasses.replace(
-                self.inputs,
-                pixel=na.Cartesian2dVectorArray(x, y),
-            ),
+        shape = a.shape
+        pixel = na.Cartesian2dVectorArray(
+            x=na.ScalarArrayRange(0, shape[axis_x], axis_x),
+            y=na.ScalarArrayRange(0, shape[axis_y], axis_y),
+        )
+
+        return self.replace(
+            inputs=taps.inputs.replace(pixel=pixel),
             outputs=a,
+            camera=taps.camera,
+            axis_x=axis_x,
+            axis_y=axis_y,
         )
 
     @property
