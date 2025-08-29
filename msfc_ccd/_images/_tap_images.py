@@ -17,10 +17,21 @@ class AbstractTapData(
     """An interface for representing data gathered by a single tap."""
 
     @property
+    def axis_tap_x(self) -> str:
+        """The name of the horizontal tap axis."""
+        return self.camera.axis_tap_x
+
+    @property
+    def axis_tap_y(self) -> str:
+        """The name of the vertical tap axis."""
+        return self.camera.axis_tap_y
+
+
+    @property
     def tap(self) -> dict[str, na.AbstractScalarArray]:
         """The 2-dimensional index of the tap corresponding to each image."""
-        axis_tap_x = self.camera.axis_tap_x
-        axis_tap_y = self.camera.axis_tap_y
+        axis_tap_x = self.axis_tap_x
+        axis_tap_y = self.axis_tap_y
         shape = self.outputs.shape
         shape_img = {
             axis_tap_x: shape[axis_tap_x],
@@ -31,8 +42,8 @@ class AbstractTapData(
     @property
     def label(self) -> na.ScalarArray:
         """Human-readable name of the tap used often for plotting."""
-        axis_tap_x = self.camera.axis_tap_x
-        axis_tap_y = self.camera.axis_tap_y
+        axis_tap_x = self.axis_tap_x
+        axis_tap_y = self.axis_tap_y
         tap_x = self.tap[axis_tap_x].astype(str).astype(object)
         tap_y = self.tap[axis_tap_y].astype(str)
         return "tap (" + tap_x + ", " + tap_y + ")"
@@ -172,25 +183,17 @@ class TapData(
         import msfc_ccd
 
         # Load the sample image
-        image = msfc_ccd.fits.open(
-            path=msfc_ccd.samples.path_fe55_esis1,
-            axis_x=axis_x,
-            axis_y=axis_y,
-        )
+        image = msfc_ccd.fits.open(msfc_ccd.samples.path_fe55_esis1)
 
         # Split the sample image into four separate images for each tap
         taps = image.taps
 
-        # Store the names of the logical axes corresponding to changing tap
-        axis_tap_x = taps.camera.axis_tap_x
-        axis_tap_y = taps.camera.axis_tap_y
-
         # Display the four images
         fig, axs = na.plt.subplots(
-            axis_rows=axis_tap_y,
-            nrows=taps.outputs.shape[axis_tap_y],
-            axis_cols=axis_tap_x,
-            ncols=taps.outputs.shape[axis_tap_x],
+            axis_rows=taps.axis_tap_y,
+            nrows=taps.outputs.shape[taps.axis_tap_y],
+            axis_cols=taps.axis_tap_x,
+            ncols=taps.outputs.shape[taps.axis_tap_x],
             sharex=True,
             sharey=True,
             constrained_layout=True,
