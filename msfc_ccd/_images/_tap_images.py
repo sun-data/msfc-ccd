@@ -197,7 +197,7 @@ class TapData(
             sharey=True,
             constrained_layout=True,
         );
-        axs = axs[{axis_tap_y: slice(None, None, -1)}]
+        axs = axs[{taps.axis_tap_y: slice(None, None, -1)}]
         na.plt.pcolormesh(
             taps.inputs.pixel,
             C=taps.outputs,
