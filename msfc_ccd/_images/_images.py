@@ -66,3 +66,11 @@ class AbstractImageData(
     @abc.abstractmethod
     def electrons(self) -> Self:
         """A new copy of these images in units of electrons."""
+
+    @property
+    def despiked(self) -> Self:
+        """Remove cosmic rays using :func:`astroscrappy.detect_cosmics`."""
+        return na.despike(
+            array=self,
+            axis=(self.axis_x, self.axis_y),
+        )

@@ -1,4 +1,5 @@
 import abc
+import astropy.units as u
 import msfc_ccd
 
 
@@ -35,3 +36,8 @@ class AbstractTestAbstractImageData(
         result = a.camera
         if result is not None:
             assert isinstance(result, msfc_ccd.abc.AbstractCamera)
+
+    def test_despiked(self, a: msfc_ccd.abc.AbstractImageData):
+        result = a.despiked
+        assert isinstance(result, type(a))
+        assert (result.outputs - a.outputs).mean() < 1e-6 * u.DN

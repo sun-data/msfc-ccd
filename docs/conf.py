@@ -100,5 +100,6 @@ intersphinx_mapping = {
     'numpy': ('https://numpy.org/doc/stable/', None),
     'matplotlib': ('https://matplotlib.org/stable', None),
     'astropy': ('https://docs.astropy.org/en/stable/', None),
+    'astroscrappy': ('https://astroscrappy.readthedocs.io/en/stable/', None),
     'named_arrays': ('https://named-arrays.readthedocs.io/en/stable/', None)
 }
