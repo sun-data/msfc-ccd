@@ -118,6 +118,7 @@ class AbstractCamera(
         self,
         a: u.Quantity | na.AbstractArray,
     ) -> na.AbstractArray:
+        """Convert an array from DN to electrons by multiplying by :attr:`gain`."""
         return self.gain * a
 
 
