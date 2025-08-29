@@ -274,6 +274,9 @@ class SensorData(
         """
         Create a new copy of this object by concatenating the data from `taps`.
 
+        This method does not concatenate the ``taps.inputs.pixel`` coordinates.
+        Instead, this method creates a new set of coordinates from the final shape.
+
         Parameters
         ----------
         taps
