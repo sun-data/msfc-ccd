@@ -1,5 +1,6 @@
 import pytest
 import numpy as np
+import astropy.units as u
 import named_arrays as na
 import msfc_ccd
 from . import test_images
@@ -40,7 +41,7 @@ class AbstractTestAbstractTapImage(
         result = a.unbiased
         assert isinstance(result, msfc_ccd.TapData)
         assert na.unit(result.outputs) == na.unit(a.outputs)
-        assert np.abs(result.outputs.mean()) < 1
+        assert np.abs(result.outputs.mean()) < 1 * u.DN
 
     def test_active(self, a: msfc_ccd.abc.AbstractTapData):
         sensor = a.camera.sensor
