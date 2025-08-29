@@ -33,6 +33,11 @@ class AbstractImageData(
         """The name of vertical axis."""
 
     @property
+    def axis_xy(self):
+        """A :class:`tuple` containing :attr:`axis_x` and :attr:`axis_y`."""
+        return (self.axis_x, self.axis_y)
+
+    @property
     def num_x(self) -> int:
         """The number of pixels along the horizontal axis."""
         return self.outputs.shape[self.axis_x]
@@ -56,3 +61,8 @@ class AbstractImageData(
     @abc.abstractmethod
     def active(self) -> Self:
         """A new copy of these images without the bias and overscan columns."""
+
+    @property
+    @abc.abstractmethod
+    def electrons(self) -> Self:
+        """A new copy of these images in units of electrons."""

@@ -1,5 +1,4 @@
 from typing_extensions import Self
-import abc
 import dataclasses
 import named_arrays as na
 from .._cameras import AbstractCamera
@@ -18,14 +17,14 @@ class AbstractTapData(
     """An interface for representing data gathered by a single tap."""
 
     @property
-    @abc.abstractmethod
     def axis_tap_x(self) -> str:
         """The name of the horizontal tap axis."""
+        return self.camera.axis_tap_x
 
     @property
-    @abc.abstractmethod
     def axis_tap_y(self) -> str:
         """The name of the vertical tap axis."""
+        return self.camera.axis_tap_y
 
     @property
     def tap(self) -> dict[str, na.AbstractScalarArray]:
@@ -42,8 +41,10 @@ class AbstractTapData(
     @property
     def label(self) -> na.ScalarArray:
         """Human-readable name of the tap used often for plotting."""
-        tap_x = self.tap["tap_x"].astype(str).astype(object)
-        tap_y = self.tap["tap_y"].astype(str)
+        axis_tap_x = self.axis_tap_x
+        axis_tap_y = self.axis_tap_y
+        tap_x = self.tap[axis_tap_x].astype(str).astype(object)
+        tap_y = self.tap[axis_tap_y].astype(str)
         return "tap (" + tap_x + ", " + tap_y + ")"
 
     def where_blank(
@@ -159,6 +160,10 @@ class AbstractTapData(
             outputs=self.outputs[slice_active],
         )
 
+    @property
+    def electrons(self) -> Self:
+        return self.camera.dn_to_electrons(self)
+
 
 @dataclasses.dataclass(eq=False, repr=False)
 class TapData(
@@ -176,38 +181,25 @@ class TapData(
         import named_arrays as na
         import msfc_ccd
 
-        # Define the x and y axes of the detector
-        axis_x = "detector_x"
-        axis_y = "detector_y"
-
-        # Define the x and y axes of the taps
-        axis_tap_x = "tap_x"
-        axis_tap_y = "tap_y"
-
         # Load the sample image
-        image = msfc_ccd.fits.open(
-            path=msfc_ccd.samples.path_fe55_esis1,
-            axis_x=axis_x,
-            axis_y=axis_y,
-        )
+        image = msfc_ccd.fits.open(msfc_ccd.samples.path_fe55_esis1)
 
         # Split the sample image into four separate images for each tap
-        taps = image.taps(axis_tap_x, axis_tap_y)
+        taps = image.taps
 
         # Display the four images
         fig, axs = na.plt.subplots(
-            axis_rows=axis_tap_y,
-            nrows=taps.outputs.shape[axis_tap_y],
-            axis_cols=axis_tap_x,
-            ncols=taps.outputs.shape[axis_tap_x],
+            axis_rows=taps.axis_tap_y,
+            nrows=taps.outputs.shape[taps.axis_tap_y],
+            axis_cols=taps.axis_tap_x,
+            ncols=taps.outputs.shape[taps.axis_tap_x],
             sharex=True,
             sharey=True,
             constrained_layout=True,
         );
-        axs = axs[{axis_tap_y: slice(None, None, -1)}]
         na.plt.pcolormesh(
             taps.inputs.pixel,
-            C=taps.outputs,
+            C=taps.outputs.value,
             ax=axs,
         );
 
@@ -227,9 +219,3 @@ class TapData(
 
     axis_y: str = dataclasses.field(default="detector_y", kw_only=True)
     """The name of the vertical axis."""
-
-    axis_tap_x: str = dataclasses.field(default="tap_x", kw_only=True)
-    """The name of the horizontal tap axis."""
-
-    axis_tap_y: str = dataclasses.field(default="tap_y", kw_only=True)
-    """The name of the vertical tap axis."""

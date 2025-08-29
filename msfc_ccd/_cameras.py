@@ -30,6 +30,16 @@ class AbstractCamera(
 
     @property
     @abc.abstractmethod
+    def axis_tap_x(self) -> str:
+        """The name of the logical axis corresponding to changing horizontal tap."""
+
+    @property
+    @abc.abstractmethod
+    def axis_tap_y(self) -> str:
+        """The name of the logical axis corresponding to changing vertical tap."""
+
+    @property
+    @abc.abstractmethod
     def timedelta_exposure(self) -> u.Quantity | na.AbstractScalar:
         """The current exposure length."""
 
@@ -104,6 +114,13 @@ class AbstractCamera(
         result = result.to(u.deg_C, equivalencies=u.temperature())
         return result
 
+    def dn_to_electrons(
+        self,
+        a: u.Quantity | na.AbstractArray,
+    ) -> na.AbstractArray:
+        """Convert an array from DN to electrons by multiplying by :attr:`gain`."""
+        return self.gain * a
+
 
 @dataclasses.dataclass
 class Camera(
@@ -126,7 +143,12 @@ class Camera(
     """
 
     gain: None | u.Quantity | na.AbstractScalar = None
-    """The conversion factor between electrons and ADC counts."""
+    """
+    The conversion factor between electrons and DN.
+    
+    This is usually tap-dependent and contains :attr:`axis_tap_x` and
+    :attr:`axis_tap_y` dimensions.
+    """
 
     bits_adc: int = 16
     """The number of bits supported by the analog-to-digital converter"""
@@ -148,6 +170,12 @@ class Camera(
 
     timedelta_readout: u.Quantity = 1.1 * u.s
     """The time required to perform a readout operation."""
+
+    axis_tap_x: str = dataclasses.field(default="tap_x", kw_only=True)
+    """The name of the logical axis corresponding to changing horizontal tap."""
+
+    axis_tap_y: str = dataclasses.field(default="tap_y", kw_only=True)
+    """The name of the logical axis corresponding to changing vertical tap."""
 
     def __post_init__(self):
         if self.sensor is None:

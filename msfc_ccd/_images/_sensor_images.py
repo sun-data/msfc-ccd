@@ -23,25 +23,14 @@ class AbstractSensorData(
 ):
     """An interface for representing data captured by an entire image sensor."""
 
-    def taps(
-        self,
-        axis_tap_x: str = "tap_x",
-        axis_tap_y: str = "tap_y",
-    ) -> msfc_ccd.TapData:
-        """
-        Split the images into separate images for each tap.
-
-        Parameters
-        ----------
-        axis_tap_x
-            The name of the logical axis corresponding to the horizontal
-            variation of the tap index.
-        axis_tap_y
-            The name of the logical axis corresponding to the vertical
-            variation of the tap index.
-        """
+    @property
+    def taps(self) -> msfc_ccd.TapData:
+        """Split the data into separate images for each tap."""
         axis_x = self.axis_x
         axis_y = self.axis_y
+
+        axis_tap_x = self.camera.axis_tap_x
+        axis_tap_y = self.camera.axis_tap_y
 
         num_x = self.num_x
         num_y = self.num_y
@@ -86,11 +75,9 @@ class AbstractSensorData(
                 pixel=na.Cartesian2dVectorArray(x, y),
             ),
             outputs=outputs,
+            camera=self.camera,
             axis_x=self.axis_x,
             axis_y=self.axis_y,
-            axis_tap_x=axis_tap_x,
-            axis_tap_y=axis_tap_y,
-            camera=self.camera,
         )
 
 
@@ -111,16 +98,10 @@ class SensorData(
         import named_arrays as na
         import msfc_ccd
 
-        # Define the x and y axes of the detector
-        axis_x = "detector_x"
-        axis_y = "detector_y"
-
         # Load the sample image
         image = msfc_ccd.SensorData.from_fits(
             path=msfc_ccd.samples.path_fe55_esis1,
             camera=msfc_ccd.Camera(),
-            axis_x=axis_x,
-            axis_y=axis_y,
         )
 
         # Display the sample image
@@ -128,9 +109,9 @@ class SensorData(
             constrained_layout=True,
         )
         im = na.plt.imshow(
-            image.outputs,
-            axis_x=axis_x,
-            axis_y=axis_y,
+            image.outputs.value,
+            axis_x=image.axis_x,
+            axis_y=image.axis_y,
             ax=ax,
         );
     """
@@ -280,7 +261,7 @@ class SensorData(
                 temperature_adc_3=temperature_adc_3,
                 temperature_adc_4=temperature_adc_4,
             ),
-            outputs=data,
+            outputs=data << u.DN,
             axis_x=axis_x,
             axis_y=axis_y,
             camera=camera,
@@ -301,8 +282,10 @@ class SensorData(
         axis_x = taps.axis_x
         axis_y = taps.axis_y
 
-        axis_tap_x = taps.axis_tap_x
-        axis_tap_y = taps.axis_tap_y
+        cam = self.camera
+
+        axis_tap_x = cam.axis_tap_x
+        axis_tap_y = cam.axis_tap_y
 
         x = taps.inputs.pixel.x
         y = taps.inputs.pixel.y
@@ -351,10 +334,15 @@ class SensorData(
 
     @property
     def unbiased(self) -> Self:
-        taps = self.taps().unbiased
+        taps = self.taps.unbiased
         return self.from_taps(taps)
 
     @property
     def active(self) -> Self:
-        taps = self.taps().active
+        taps = self.taps.active
+        return self.from_taps(taps)
+
+    @property
+    def electrons(self) -> Self:
+        taps = self.taps.electrons
         return self.from_taps(taps)

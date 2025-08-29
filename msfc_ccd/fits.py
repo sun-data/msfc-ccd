@@ -47,25 +47,17 @@ def open(
         import named_arrays as na
         import msfc_ccd
 
-        # Define the x and y axes of the detector
-        axis_x = "detector_x"
-        axis_y = "detector_y"
-
         # Load the sample image
-        image = msfc_ccd.fits.open(
-            path=msfc_ccd.samples.path_fe55_esis1,
-            axis_x=axis_x,
-            axis_y=axis_y,
-        )
+        image = msfc_ccd.fits.open(msfc_ccd.samples.path_fe55_esis1)
 
         # Display the sample image
         fig, ax = plt.subplots(
             constrained_layout=True,
         )
         im = na.plt.imshow(
-            image.outputs,
-            axis_x=axis_x,
-            axis_y=axis_y,
+            image.outputs.value,
+            axis_x=image.axis_x,
+            axis_y=image.axis_y,
             ax=ax,
         );
 
@@ -79,11 +71,7 @@ def open(
         import named_arrays as na
         import msfc_ccd
 
-        # Define the x and y axes of the detector
-        axis_x = "detector_x"
-        axis_y = "detector_y"
-
-        # Define an arbitrary third axis representing two different exposures
+        # Define the name of the time axis.
         axis_time = "time"
 
         # Define the array of two sample FITS files
@@ -96,11 +84,7 @@ def open(
         )
 
         # Load the sample images
-        image = msfc_ccd.fits.open(
-            path=path,
-            axis_x=axis_x,
-            axis_y=axis_y,
-        )
+        image = msfc_ccd.fits.open(path)
 
         # Display the sample images
         fig, axs = na.plt.subplots(
@@ -110,9 +94,9 @@ def open(
             constrained_layout=True,
         )
         im = na.plt.imshow(
-            image.outputs,
-            axis_x=axis_x,
-            axis_y=axis_y,
+            image.outputs.value,
+            axis_x=image.axis_x,
+            axis_y=image.axis_y,
             ax=axs,
         );
     """

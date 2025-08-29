@@ -16,6 +16,13 @@ class AbstractTestAbstractImageData(
         assert isinstance(result, str)
         assert result in a.outputs.shape
 
+    def test_axis_xy(self, a: msfc_ccd.abc.AbstractImageData):
+        result = a.axis_xy
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+        assert a.axis_x in result
+        assert a.axis_y in result
+
     def test_num_x(self, a: msfc_ccd.abc.AbstractImageData):
         result = a.num_x
         assert isinstance(result, int)
