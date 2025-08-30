@@ -5,7 +5,14 @@ import named_arrays as na
 import msfc_ccd
 from . import test_images
 
-_camera = msfc_ccd.Camera(gain=2.5 * u.electron / u.DN)
+_camera = msfc_ccd.Camera(
+    gain=na.ScalarArray(
+        ndarray=[[2.5, 2.6], [2.7, 2.8]] * u.electron / u.DN,
+        axes=("tx", "ty"),
+    ),
+    axis_tap_x="tx",
+    axis_tap_y="ty",
+)
 
 
 class AbstractTestAbstractSensorData(
