@@ -57,12 +57,14 @@ class AbstractTestAbstractTapImage(
         assert result.shape[axis_tap_y] == a.shape[axis_tap_y]
 
     def test_unbiased(self, a: msfc_ccd.abc.AbstractTapData):
+        super().test_unbiased(a)
         result = a.unbiased
         assert isinstance(result, msfc_ccd.TapData)
         assert na.unit(result.outputs) == na.unit(a.outputs)
         assert np.abs(result.outputs.mean()) < 1 * u.DN
 
     def test_active(self, a: msfc_ccd.abc.AbstractTapData):
+        super().test_active(a)
         sensor = a.camera.sensor
         num_nap = sensor.num_blank + sensor.num_overscan
         result = a.active

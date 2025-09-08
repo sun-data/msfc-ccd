@@ -26,6 +26,7 @@ class AbstractTestAbstractSensorData(
         self,
         a: msfc_ccd.abc.AbstractSensorData,
     ):
+        super().test_unbiased(a)
         result = a.unbiased
         taps = result.taps
         assert isinstance(result, msfc_ccd.SensorData)
@@ -37,13 +38,13 @@ class AbstractTestAbstractSensorData(
         self,
         a: msfc_ccd.abc.AbstractSensorData,
     ):
+        super().test_active(a)
         sensor = a.camera.sensor
         num_nap = 2 * (sensor.num_blank + sensor.num_overscan)
         result = a.active
         assert isinstance(result, msfc_ccd.SensorData)
         assert result.shape[a.axis_x] == a.shape[a.axis_x] - num_nap
         assert result.shape[a.axis_y] == a.shape[a.axis_y]
-
 
 
 @pytest.mark.parametrize(

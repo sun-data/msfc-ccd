@@ -18,9 +18,7 @@ class AbstractImageData(
         na.AbstractScalarArray,
     ],
 ):
-    """
-    An interface for image-like data.
-    """
+    """An interface for image-like data."""
 
     @property
     @abc.abstractmethod
@@ -46,6 +44,7 @@ class AbstractImageData(
     def num_y(self) -> int:
         """The number of pixels along the vertical axis."""
         return self.outputs.shape[self.axis_y]
+
 
 class AbstractCameraData(
     AbstractImageData,

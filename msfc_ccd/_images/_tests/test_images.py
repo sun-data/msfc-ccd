@@ -50,20 +50,20 @@ class AbstractTestAbstractCameraData(
     @abc.abstractmethod
     def test_unbiased(
         self,
-        a: msfc_ccd.SensorData,
+        a: msfc_ccd.abc.AbstractImageData,
     ):
         pass
 
     @abc.abstractmethod
     def test_active(
         self,
-        a: msfc_ccd.SensorData,
+        a: msfc_ccd.abc.AbstractImageData,
     ):
         pass
 
     def test_electrons(
         self,
-        a: msfc_ccd.SensorData,
+        a: msfc_ccd.abc.AbstractImageData,
     ):
         result = a.electrons
         assert result.sum() != 0 * u.electron
