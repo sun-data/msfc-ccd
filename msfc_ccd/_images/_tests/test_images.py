@@ -32,6 +32,11 @@ class AbstractTestAbstractImageData(
         result = a.num_y
         assert isinstance(result, int)
 
+
+class AbstractTestAbstractCameraData(
+    AbstractTestAbstractImageData,
+):
+
     def test_camera(self, a: msfc_ccd.abc.AbstractImageData):
         result = a.camera
         if result is not None:
@@ -41,3 +46,24 @@ class AbstractTestAbstractImageData(
         result = a.despiked
         assert isinstance(result, type(a))
         assert (result.outputs - a.outputs).mean() < 1e-6 * u.DN
+
+    @abc.abstractmethod
+    def test_unbiased(
+        self,
+        a: msfc_ccd.SensorData,
+    ):
+        pass
+
+    @abc.abstractmethod
+    def test_active(
+        self,
+        a: msfc_ccd.SensorData,
+    ):
+        pass
+
+    def test_electrons(
+        self,
+        a: msfc_ccd.SensorData,
+    ):
+        result = a.electrons
+        assert result.sum() != 0 * u.electron

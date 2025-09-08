@@ -10,7 +10,7 @@ import named_arrays as na
 import msfc_ccd
 from .._cameras import AbstractCamera
 from ._vectors import ImageHeader
-from ._images import AbstractImageData
+from ._images import AbstractCameraData
 
 __all__ = [
     "SensorData",
@@ -19,7 +19,7 @@ __all__ = [
 
 @dataclasses.dataclass(eq=False, repr=False)
 class AbstractSensorData(
-    AbstractImageData,
+    AbstractCameraData,
 ):
     """An interface for representing data captured by an entire image sensor."""
 
