@@ -3,7 +3,7 @@ import dataclasses
 import named_arrays as na
 from .._cameras import AbstractCamera
 from ._vectors import ImageHeader
-from ._images import AbstractImageData
+from ._images import AbstractCameraData
 
 __all__ = [
     "TapData",
@@ -12,7 +12,7 @@ __all__ = [
 
 @dataclasses.dataclass(eq=False, repr=False)
 class AbstractTapData(
-    AbstractImageData,
+    AbstractCameraData,
 ):
     """An interface for representing data gathered by a single tap."""
 

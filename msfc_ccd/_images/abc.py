@@ -2,10 +2,11 @@
 
 __all__ = [
     "AbstractImageData",
+    "AbstractCameraData",
     "AbstractSensorData",
     "AbstractTapData",
 ]
 
-from ._images import AbstractImageData
+from ._images import AbstractImageData, AbstractCameraData
 from ._sensor_images import AbstractSensorData
 from ._tap_images import AbstractTapData

@@ -4,10 +4,16 @@ __all__ = [
     "AbstractSensor",
     "AbstractCamera",
     "AbstractImageData",
+    "AbstractCameraData",
     "AbstractSensorData",
     "AbstractTapData",
 ]
 
 from ._sensors import AbstractSensor
 from ._cameras import AbstractCamera
-from ._images.abc import AbstractImageData, AbstractSensorData, AbstractTapData
+from ._images.abc import (
+    AbstractImageData,
+    AbstractCameraData,
+    AbstractSensorData,
+    AbstractTapData,
+)

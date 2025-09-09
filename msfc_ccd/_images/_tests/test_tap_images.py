@@ -5,9 +5,18 @@ import named_arrays as na
 import msfc_ccd
 from . import test_images
 
+_camera = msfc_ccd.Camera(
+    gain=na.ScalarArray(
+        ndarray=[[2.5, 2.6], [2.7, 2.8]] * u.electron / u.DN,
+        axes=("tx", "ty"),
+    ),
+    axis_tap_x="tx",
+    axis_tap_y="ty",
+)
+
 
 class AbstractTestAbstractTapImage(
-    test_images.AbstractTestAbstractImageData,
+    test_images.AbstractTestAbstractCameraData,
 ):
 
     def test_axis_tap_x(self, a: msfc_ccd.abc.AbstractTapData):
@@ -48,12 +57,14 @@ class AbstractTestAbstractTapImage(
         assert result.shape[axis_tap_y] == a.shape[axis_tap_y]
 
     def test_unbiased(self, a: msfc_ccd.abc.AbstractTapData):
+        super().test_unbiased(a)
         result = a.unbiased
         assert isinstance(result, msfc_ccd.TapData)
         assert na.unit(result.outputs) == na.unit(a.outputs)
         assert np.abs(result.outputs.mean()) < 1 * u.DN
 
     def test_active(self, a: msfc_ccd.abc.AbstractTapData):
+        super().test_active(a)
         sensor = a.camera.sensor
         num_nap = sensor.num_blank + sensor.num_overscan
         result = a.active
@@ -65,7 +76,7 @@ class AbstractTestAbstractTapImage(
 @pytest.mark.parametrize(
     argnames="a",
     argvalues=[
-        msfc_ccd.fits.open(msfc_ccd.samples.path_dark_esis1).taps,
+        msfc_ccd.fits.open(msfc_ccd.samples.path_dark_esis1, _camera).taps,
     ],
 )
 class TestTapImage(

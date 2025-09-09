@@ -5,7 +5,10 @@ import named_arrays as na
 from .._cameras import AbstractCamera
 from ._vectors import ImageHeader
 
-__all__ = []
+__all__ = [
+    "AbstractImageData",
+    "AbstractCameraData",
+]
 
 
 @dataclasses.dataclass(eq=False, repr=False)
@@ -15,12 +18,7 @@ class AbstractImageData(
         na.AbstractScalarArray,
     ],
 ):
-    """
-    An interface for image-like data.
-
-    This class is useful for a single interface for data from the entire image
-    sensor and for data from only a single tap on the sensor.
-    """
+    """An interface for image-like data."""
 
     @property
     @abc.abstractmethod
@@ -46,6 +44,17 @@ class AbstractImageData(
     def num_y(self) -> int:
         """The number of pixels along the vertical axis."""
         return self.outputs.shape[self.axis_y]
+
+
+class AbstractCameraData(
+    AbstractImageData,
+):
+    """
+    An interface for image data taken with a particular camera.
+
+    This class is useful for a single interface for data from the entire image
+    sensor and for data from only a single tap on the sensor.
+    """
 
     @property
     @abc.abstractmethod
