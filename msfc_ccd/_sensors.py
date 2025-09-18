@@ -179,7 +179,7 @@ class TeledyneCCD230(
         """
         result = self.num_pixel
         if self.readout_mode == "transfer":
-            return result.replace(y=result.y / 2)
+            return result.replace(y=result.y // 2)
 
     @property
     def width_package(self) -> na.Cartesian2dVectorArray:
