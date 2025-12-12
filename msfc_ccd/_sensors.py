@@ -4,6 +4,7 @@ import dataclasses
 import numpy as np
 import astropy.units as u
 import named_arrays as na
+import optika
 
 __all__ = [
     "TeledyneCCD230",
@@ -36,6 +37,11 @@ class AbstractSensor(
     @abc.abstractmethod
     def serial_number(self) -> None | str:
         """A unique number which identifies this sensor."""
+
+    @property
+    @abc.abstractmethod
+    def material(self) -> optika.sensors.materials.AbstractSiliconSensorMaterial:
+        """The light-sensitive material used by this sensor."""
 
     @property
     @abc.abstractmethod
@@ -79,9 +85,9 @@ class AbstractSensor(
         """The standard deviation of the error on each pixel value."""
 
     @property
-    @abc.abstractmethod
     def temperature(self):
         """The operating temperature of this sensor."""
+        return self.material.temperature
 
     def dark_current(
         self,
@@ -118,6 +124,13 @@ class TeledyneCCD230(
     The quality of the device.
 
     Grade 0 is the best possible and Grade 5 is the worst possible.
+    """
+
+    material: None | optika.sensors.materials.AbstractSiliconSensorMaterial = None
+    """
+    The light-sensitive material used by this sensor.
+    
+    If :obj:`None`, :func:`optika.sensors.materials.ccd_97` will be used.
     """
 
     width_pixel: u.Quantity = 15 * u.um
@@ -157,6 +170,10 @@ class TeledyneCCD230(
 
     width_package_y: u.Quantity = 61 * u.mm
     """The vertical size of the physical sensor package."""
+
+    def __post_init__(self):
+        if self.material is None:
+            self.material = optika.sensors.materials.e2v_ccd97()
 
     @property
     def num_pixel(self) -> na.Cartesian2dVectorArray:
