@@ -95,7 +95,6 @@ class AbstractSensor(
         temperature
             The temperature of the sensor.
             If :obj:`None`, the value of :attr:`temperature` is used.
-
         """
 
 
