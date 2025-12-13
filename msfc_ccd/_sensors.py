@@ -11,9 +11,9 @@ __all__ = [
 ]
 
 
-@dataclasses.dataclass(eq=False, repr=False)
+@dataclasses.dataclass(repr=False)
 class AbstractSensor(
-    abc.ABC,
+    optika.mixins.Printable,
 ):
     """An interface for an imaging sensor or an ensemble of imaging sensors."""
 
@@ -104,7 +104,7 @@ class AbstractSensor(
         """
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(repr=False)
 class TeledyneCCD230(
     AbstractSensor,
 ):

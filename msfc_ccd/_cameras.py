@@ -4,6 +4,7 @@ import numpy as np
 import astropy.units as u
 import named_arrays as na
 from ._sensors import AbstractSensor
+import optika
 import msfc_ccd
 
 __all__ = [
@@ -12,9 +13,9 @@ __all__ = [
 ]
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(repr=False)
 class AbstractCamera(
-    abc.ABC,
+    optika.mixins.Printable,
 ):
     """An interface describing a generalized camera."""
 
@@ -122,7 +123,7 @@ class AbstractCamera(
         return self.gain * a
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(repr=False)
 class Camera(
     AbstractCamera,
 ):
