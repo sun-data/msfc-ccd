@@ -1,6 +1,7 @@
 import pytest
 import astropy.units as u
 import msfc_ccd
+from optika.sensors.materials import AbstractSiliconSensorMaterial
 
 
 class AbstractTestAbstractSensor:
@@ -21,6 +22,9 @@ class AbstractTestAbstractSensor:
     def test_serial_number(self, a: msfc_ccd.abc.AbstractSensor):
         if a.serial_number is not None:
             assert isinstance(a.serial_number, str)
+
+    def test_material(self, a: msfc_ccd.abc.AbstractSensor):
+        assert isinstance(a.material, AbstractSiliconSensorMaterial)
 
     def test_width_pixel(self, a: msfc_ccd.abc.AbstractSensor):
         assert a.width_pixel > 0 * u.um

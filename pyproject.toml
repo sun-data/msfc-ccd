@@ -9,13 +9,14 @@ authors = [
 ]
 description = "A Python library for characterizing and using the CCD cameras developed by Marshall Space Flight Center."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 classifiers = [
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
     "astropy",
-    "named-arrays>=0.26.0",
+    "named-arrays~=1.0",
+    "optika~=1.0",
 ]
 dynamic = ["version"]
 
