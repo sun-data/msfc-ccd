@@ -130,7 +130,7 @@ class TeledyneCCD230(
     """
     The light-sensitive material used by this sensor.
     
-    If :obj:`None`, :func:`optika.sensors.materials.ccd_97` will be used.
+    If :obj:`None`, :func:`optika.sensors.materials.e2v_ccd97` will be used.
     """
 
     width_pixel: u.Quantity = 15 * u.um
