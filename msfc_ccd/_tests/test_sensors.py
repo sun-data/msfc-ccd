@@ -2,9 +2,12 @@ import pytest
 import astropy.units as u
 import msfc_ccd
 from optika.sensors.materials import AbstractSiliconSensorMaterial
+from optika._tests.test_mixins import AbstractTestPrintable
 
 
-class AbstractTestAbstractSensor:
+class AbstractTestAbstractSensor(
+    AbstractTestPrintable,
+):
 
     def test_num_tap_x(self, a: msfc_ccd.abc.AbstractSensor):
         result = a.num_tap_x

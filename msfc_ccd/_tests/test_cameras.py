@@ -1,12 +1,12 @@
 import pytest
-import abc
 import astropy.units as u
 import named_arrays as na
 import msfc_ccd
+from optika._tests.test_mixins import AbstractTestPrintable
 
 
-class AbstractTestAbstractSensor(
-    abc.ABC,
+class AbstractTestAbstractCamera(
+    AbstractTestPrintable,
 ):
 
     @pytest.mark.parametrize("value", [1, 10])
@@ -62,6 +62,6 @@ class AbstractTestAbstractSensor(
     ],
 )
 class TestCamera(
-    AbstractTestAbstractSensor,
+    AbstractTestAbstractCamera,
 ):
     pass
