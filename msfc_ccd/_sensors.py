@@ -162,9 +162,6 @@ class TeledyneCCD230(
     or half of the sensor is used for storage (``"transfer"``).
     """
 
-    temperature: u.Quantity | na.AbstractScalar = 248 * u.K
-    """The operating temperature of this sensor."""
-
     width_package_x: u.Quantity = 42 * u.mm
     """The horizontal size of the physical sensor package."""
 
