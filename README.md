@@ -8,6 +8,8 @@
 
 A Python library for characterizing and using the CCD cameras developed by Marshall Space Flight Center.
 
+More information is available in the [documentation](https://msfc-ccd.readthedocs.io/).
+
 ## Installation
 
 `msfc-ccd` is available on PyPI and can be installed using pip:
@@ -15,3 +17,28 @@ A Python library for characterizing and using the CCD cameras developed by Marsh
 ```shell
 pip install msfc-ccd
 ```
+
+## Examples
+
+Load and display a single FITS file.
+
+```python3
+import matplotlib.pyplot as plt
+import named_arrays as na
+import msfc_ccd
+
+# Load the sample image
+image = msfc_ccd.fits.open(msfc_ccd.samples.path_fe55_esis1)
+
+# Display the sample image
+fig, ax = plt.subplots(
+    constrained_layout=True,
+)
+im = na.plt.imshow(
+    image.outputs.value,
+    axis_x=image.axis_x,
+    axis_y=image.axis_y,
+    ax=ax,
+);
+```
+![A sample FITS image](https://msfc-ccd.readthedocs.io/en/latest/_images/index_0_0.png)
