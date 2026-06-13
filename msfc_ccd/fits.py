@@ -4,7 +4,6 @@ import pathlib
 import named_arrays as na
 import msfc_ccd
 
-
 __all__ = [
     "open",
 ]
