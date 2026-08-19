@@ -119,8 +119,31 @@ class AbstractCamera(
         self,
         a: u.Quantity | na.AbstractArray,
     ) -> na.AbstractArray:
-        """Convert an array from DN to electrons by multiplying by :attr:`gain`."""
-        return self.gain * a
+        """
+        Convert an array from DN to electrons by multiplying by :attr:`gain`.
+
+        Parameters
+        ----------
+        a
+            The array, in units of DN, to convert into units of electrons.
+
+        Raises
+        ------
+        ValueError
+            If :attr:`gain` is :obj:`None`, since there is no measured default
+            gain for these cameras.
+        """
+        gain = self.gain
+
+        if gain is None:
+            raise ValueError(
+                "`gain` is `None`, so this camera cannot convert DN into "
+                "electrons. Measure the gain of this camera and provide it "
+                "explicitly, for example "
+                "`msfc_ccd.Camera(gain=2.5 * u.electron / u.DN)`."
+            )
+
+        return gain * a
 
 
 @dataclasses.dataclass(repr=False)
@@ -149,6 +172,10 @@ class Camera(
     
     This is usually tap-dependent and contains :attr:`axis_tap_x` and
     :attr:`axis_tap_y` dimensions.
+
+    There is no measured default, so this must be provided explicitly before
+    :meth:`msfc_ccd.abc.AbstractCamera.dn_to_electrons` (and therefore
+    :attr:`msfc_ccd.abc.AbstractCameraData.electrons`) can be used.
     """
 
     bits_adc: int = 16
