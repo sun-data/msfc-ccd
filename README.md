@@ -49,7 +49,8 @@ Those columns see no light, so their mean is an estimate of the bias for that ta
 
 **Converting to electrons needs a gain.**
 `.electrons` multiplies by `Camera.gain`, which is usually different for each tap and has to be measured.
-A `Camera` constructed without one, which is what `fits.open()` uses by default, has no gain to apply, so supply your measured value with `msfc_ccd.Camera(gain=...)` before converting.
+A `Camera` constructed without one, which is what `fits.open()` uses by default, has no gain to apply, and raises a `ValueError` naming the missing parameter rather than guessing.
+Supply your measured value with `msfc_ccd.Camera(gain=...)` before converting, remembering that the gain differs from tap to tap.
 
 ## Examples
 

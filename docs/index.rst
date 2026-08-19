@@ -77,8 +77,10 @@ and the two compose: ``image.taps.unbiased.active``.
 :attr:`msfc_ccd.Camera.gain`, which is usually different for each tap and has
 to be measured.
 A :class:`msfc_ccd.Camera` constructed without one, which is what
-:func:`msfc_ccd.fits.open` uses by default, has no gain to apply, so supply
-your measured value with ``msfc_ccd.Camera(gain=...)`` before converting.
+:func:`msfc_ccd.fits.open` uses by default, has no gain to apply, and raises a
+:class:`ValueError` naming the missing parameter rather than guessing.
+Supply your measured value with ``msfc_ccd.Camera(gain=...)`` before
+converting, remembering that the gain differs from tap to tap.
 
 
 Examples
