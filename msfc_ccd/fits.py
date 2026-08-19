@@ -29,6 +29,9 @@ def open(
         A model of the camera used to capture the images being loaded.
         If :obj:`None` (the default), the :class:`msfc_ccd.Camera`
         will be used.
+        Note that the default camera has no :attr:`msfc_ccd.Camera.gain`,
+        so a camera with an explicit gain must be provided to use
+        :attr:`msfc_ccd.SensorData.electrons` on the result.
     axis_x
         The name of the logical axis representing the horizontal dimension of
         the images.

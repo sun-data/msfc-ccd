@@ -9,6 +9,26 @@ class AbstractTestAbstractCamera(
     AbstractTestPrintable,
 ):
 
+    def test_gain(
+        self,
+        a: msfc_ccd.abc.AbstractCamera,
+    ):
+        result = a.gain
+        if result is not None:
+            assert na.unit(result).is_equivalent(u.electron / u.DN)
+
+    def test_dn_to_electrons(
+        self,
+        a: msfc_ccd.abc.AbstractCamera,
+    ):
+        b = 100 * u.DN
+        if a.gain is None:
+            with pytest.raises(ValueError, match="`gain` is `None`"):
+                a.dn_to_electrons(b)
+        else:
+            result = a.dn_to_electrons(b)
+            assert na.unit(result).is_equivalent(u.electron)
+
     @pytest.mark.parametrize("value", [1, 10])
     def test_calibrate_timedelta_exposure(
         self,
@@ -59,6 +79,12 @@ class AbstractTestAbstractCamera(
     argnames="a",
     argvalues=[
         msfc_ccd.Camera(),
+        msfc_ccd.Camera(
+            gain=na.ScalarArray(
+                ndarray=[[2.5, 2.6], [2.7, 2.8]] * u.electron / u.DN,
+                axes=("tap_x", "tap_y"),
+            ),
+        ),
     ],
 )
 class TestCamera(
