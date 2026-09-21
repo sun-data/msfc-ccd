@@ -96,14 +96,29 @@ class AbstractTapData(
 
     def bias(
         self,
-        num_blank: None | int = 0,
-        num_overscan: None | int = None,
+        num_blank: None | int = 25,
+        num_overscan: None | int = 0,
     ) -> Self:
         """
-        Compute the bias (or pedastal) for each tap.
+        Compute the bias (or pedestal) for each tap.
 
         Select a number of blank pixels and a number of overscan pixels and
         take the mean to compute the bias.
+
+        By default, only the 25 blank columns closest to the active pixels
+        are used.
+        The blank columns are read out before any of the active pixels,
+        so they are not affected by the signal in the image,
+        and the first half of the blank columns is ignored since it contains
+        a transient from the start of each row.
+        The overscan columns are not used by default since they contain
+        charge deferred from the last active pixels in each row,
+        which makes the bias depend on the brightness of the image.
+
+        The blank columns are offset from the dark level of the active pixels
+        by up to about 1 DN, and this offset is different for each tap.
+        This offset is constant in time, so it is removed if a dark image
+        prepared using the same bias is subtracted from the result.
 
         Parameters
         ----------
@@ -114,7 +129,7 @@ class AbstractTapData(
         num_overscan
             The number of overscan columns to use starting from those closest
             to the active pixels.
-            If :obj:`None` (the default), all the overscan pixels are used.
+            If :obj:`None`, all the overscan pixels are used.
 
 
         .. nblinkgallery::

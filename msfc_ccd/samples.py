@@ -7,6 +7,8 @@ __all__ = [
     "path_fe55_esis3",
     "path_dark_esis1",
     "path_dark_esis3",
+    "path_led_esis1",
+    "path_led_dark_esis1",
 ]
 
 path_fe55_esis1 = pathlib.Path(__file__).parent / "_data/fe55/ESIS1_00002.fit"
@@ -37,4 +39,19 @@ path_dark_esis3 = pathlib.Path(__file__).parent / "_data/darks/ESIS3_00099.fit.g
 A sample dark image from the ESIS channel 3 camera.
 
 Captured during the ESIS launch on 2019-09-30.
+"""
+
+path_led_esis1 = pathlib.Path(__file__).parent / "_data/led/ESIS1_04803.fit.gz"
+"""
+A sample image of a diffuse LED source from the ESIS channel 1 camera.
+
+Gathered by the MSFC sounding rocket team during the linearity test
+on 2017-07-12.
+"""
+
+path_led_dark_esis1 = pathlib.Path(__file__).parent / "_data/led/ESIS1_04860.fit.gz"
+"""
+A sample dark image from the ESIS channel 1 camera.
+
+Gathered two minutes after :obj:`path_led_esis1`, with the LED turned off.
 """
