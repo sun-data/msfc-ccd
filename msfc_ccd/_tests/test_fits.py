@@ -34,6 +34,13 @@ def test_open(path: str | pathlib.Path | na.AbstractScalarArray):
     result = msfc_ccd.fits.open(path)
     assert isinstance(result, msfc_ccd.SensorData)
     assert result.outputs.sum() != 0
+    header = result.inputs
+    assert np.all(np.char.startswith(header.camera_id.ndarray, "ESIS"))
+    assert np.all(np.isin(header.serial_number.ndarray, ["6", "9"]))
+    assert np.all(header.run_mode.ndarray == "Synchronous External Trigger")
+    assert np.all(header.status.ndarray == "Complete")
+    assert np.all(header.sequence_number >= 0)
+    assert np.all(header.count >= 0)
 
 
 @pytest.mark.parametrize(
