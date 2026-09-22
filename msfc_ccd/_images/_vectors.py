@@ -31,6 +31,21 @@ class ImageHeader(
     serial_number: None | str | na.AbstractScalar = None
     """The serial number of the camera that captured each image."""
 
+    camera_id: None | str | na.AbstractScalar = None
+    """The name of the camera that captured each image, e.g. ``"ESIS1"``."""
+
+    sequence_number: None | int | na.AbstractScalar = None
+    """
+    The index of each image within the sequence captured since the camera
+    was powered on.
+    """
+
+    count: None | int | na.AbstractScalar = None
+    """
+    The index of each image within the sequence captured since the run mode
+    of the camera was last changed.
+    """
+
     run_mode: None | str | na.AbstractScalar = None
     """The Run Mode of the camera when each image was captured."""
 
@@ -85,6 +100,9 @@ class ImageHeader(
             timedelta=scalar,
             timedelta_requested=scalar,
             serial_number=scalar,
+            camera_id=scalar,
+            sequence_number=scalar,
+            count=scalar,
             run_mode=scalar,
             status=scalar,
             voltage_fpga_vccint=scalar,

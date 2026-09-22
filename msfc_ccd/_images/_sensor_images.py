@@ -162,9 +162,12 @@ class SensorData(
 
         timedelta = np.empty_like(path, dtype=np.int64)
         timedelta_requested = np.empty_like(path, dtype=float) << u.s
-        serial_number = np.empty_like(path, dtype=str)
-        run_mode = np.empty_like(path, dtype=str)
-        status = np.empty_like(path, dtype=str)
+        serial_number = np.empty_like(path, dtype=object)
+        camera_id = np.empty_like(path, dtype=object)
+        sequence_number = np.empty_like(path, dtype=int)
+        count = np.empty_like(path, dtype=int)
+        run_mode = np.empty_like(path, dtype=object)
+        status = np.empty_like(path, dtype=object)
         voltage_fpga_vccint = np.empty_like(path, dtype=int)
         voltage_fpga_vccaux = np.empty_like(path, dtype=int)
         voltage_fpga_vccbram = np.empty_like(path, dtype=int)
@@ -196,6 +199,9 @@ class SensorData(
             timedelta[index] = header["MEAS_EXP"]
             timedelta_requested[index] = header["IMG_EXP"] * u.ms
             serial_number[index] = header.get("CAM_SN")
+            camera_id[index] = header.get("CAM_ID")
+            sequence_number[index] = header["IMG_ISN"]
+            count[index] = header["IMG_CNT"]
             run_mode[index] = header.get("RUN_MODE")
             status[index] = header.get("IMG_STAT")
             voltage_fpga_vccint[index] = header["FPGAVINT"]
@@ -206,6 +212,11 @@ class SensorData(
             temperature_adc_2[index] = header["ADCTEMP2"]
             temperature_adc_3[index] = header["ADCTEMP3"]
             temperature_adc_4[index] = header["ADCTEMP4"]
+
+        serial_number = serial_number.astype(str)
+        camera_id = camera_id.astype(str)
+        run_mode = run_mode.astype(str)
+        status = status.astype(str)
 
         timedelta = camera.calibrate_timedelta_exposure(timedelta)
         voltage_fpga_vccint = camera.calibrate_voltage_fpga(voltage_fpga_vccint)
@@ -243,6 +254,11 @@ class SensorData(
             if np.all(sn0 == serial_number):
                 serial_number = sn0
 
+        for axis in camera_id.shape:
+            id0 = camera_id[{axis: 0}]
+            if np.all(id0 == camera_id):
+                camera_id = id0
+
         return cls(
             inputs=ImageHeader(
                 pixel=pixel,
@@ -250,6 +266,9 @@ class SensorData(
                 timedelta=timedelta,
                 timedelta_requested=timedelta_requested,
                 serial_number=serial_number,
+                camera_id=camera_id,
+                sequence_number=sequence_number,
+                count=count,
                 run_mode=run_mode,
                 status=status,
                 voltage_fpga_vccint=voltage_fpga_vccint,

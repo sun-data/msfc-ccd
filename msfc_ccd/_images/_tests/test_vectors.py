@@ -29,6 +29,9 @@ import msfc_ccd
             ),
             timedelta_requested=10 * u.s,
             serial_number="SN-001",
+            camera_id="CAM-1",
+            sequence_number=na.arange(0, 5, axis="t"),
+            count=na.arange(0, 5, axis="t"),
             run_mode="sequence",
             status="completed",
             voltage_fpga_vccint=5 * u.V,
@@ -89,6 +92,18 @@ class TestImageHeader:
     def test_serial_number(self, a: msfc_ccd.ImageHeader):
         result = a.serial_number
         assert isinstance(result, (str, na.AbstractScalar))
+
+    def test_camera_id(self, a: msfc_ccd.ImageHeader):
+        result = a.camera_id
+        assert isinstance(result, (str, na.AbstractScalar))
+
+    def test_sequence_number(self, a: msfc_ccd.ImageHeader):
+        result = a.sequence_number
+        assert np.all(result >= 0)
+
+    def test_count(self, a: msfc_ccd.ImageHeader):
+        result = a.count
+        assert np.all(result >= 0)
 
     def test_run_mode(self, a: msfc_ccd.ImageHeader):
         result = a.run_mode
