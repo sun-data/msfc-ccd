@@ -232,6 +232,110 @@ class AbstractTapData(
             outputs=std / np.sqrt(2),
         )
 
+    def dark_current(
+        self,
+        axis: str,
+        proportion: float = 0.01,
+    ) -> Self:
+        """
+        Estimate the dark current rate of each tap.
+
+        The images must be a sequence of darks gathered using a range of
+        exposure lengths.
+        The signal in each image is the trimmed mean of the bias-subtracted
+        active pixels, and the rate is the slope of a linear fit of that signal
+        against the measured exposure time of each image,
+        :attr:`msfc_ccd.ImageHeader.timedelta`.
+
+        The intercept of the fit is discarded.
+        The blank columns used to compute the bias are offset from the dark
+        level of the active pixels by about 1 DN,
+        and the fixed pattern of the sensor is not removed,
+        so the intercept is not the dark current at zero exposure.
+        Only the slope is independent of both.
+
+        The dark current accumulated during a single image is much smaller
+        than the readout noise, about 0.07 DN in a two-second image,
+        so it is only measurable after averaging over all the active pixels,
+        and a long exposure is needed to separate it from the bias.
+
+        Parameters
+        ----------
+        axis
+            The logical axis along which the images are a sequence of darks.
+        proportion
+            The fraction of the brightest and darkest active pixels to remove
+            from each image before taking the mean.
+
+            The default removes the cosmic rays and leaves everything else.
+            Cosmic rays accumulate in proportion to the exposure time,
+            so without any trimming they enter the slope directly and the
+            signal grows faster than the dark current does.
+
+            Trimming much harder than the default removes the hot pixels too,
+            which changes what is being measured.
+            Each pixel has its own dark current rate,
+            so as the exposure time grows the brightest pixels are
+            increasingly the ones with the highest rates,
+            and a heavy trim follows a progressively cooler subset of the
+            sensor.
+            The result is then the rate of a typical pixel rather than the
+            mean over the sensor, and it no longer grows linearly with the
+            exposure time, which makes the slope of the fit depend on which
+            exposures were used.
+            Measured on the dark tests of 2017-07-12, the slope between 4 and
+            12 seconds is 1.44 times the slope between 2 and 4 seconds with no
+            trimming, 1.01 times at the default, and 0.66 times at a
+            proportion of 0.25.
+
+        Examples
+        --------
+        Estimate the dark current rate of the ESIS channel 1 camera using
+        a pair of dark images with different exposure lengths.
+
+        .. jupyter-execute::
+
+            import numpy as np
+            import named_arrays as na
+            import msfc_ccd
+
+            # Load a two-second dark image and a twelve-second dark image
+            path = na.ScalarArray(
+                ndarray=np.array([
+                    msfc_ccd.samples.path_dark_2s_esis1,
+                    msfc_ccd.samples.path_dark_12s_esis1,
+                ]),
+                axes="time",
+            )
+            images = msfc_ccd.fits.open(path)
+
+            # Estimate the dark current rate of each tap
+            images.taps.dark_current("time").outputs.to("DN / s")
+
+        Two images give only a rough estimate, since the uncertainty in the
+        bias of each image is about a tenth of the signal accumulated between
+        them.
+        Averaging many images at each of five exposure lengths gives
+        0.038 to 0.042 DN / s across the four taps of this camera.
+        """
+        signal = na.mean_trimmed(
+            a=self.unbiased.active.outputs,
+            q=proportion,
+            axis=self.axis_xy,
+        )
+        timedelta = self.inputs.timedelta
+
+        signal = signal - signal.mean(axis)
+        timedelta = timedelta - timedelta.mean(axis)
+
+        rate = (timedelta * signal).sum(axis) / np.square(timedelta).sum(axis)
+
+        return dataclasses.replace(
+            self,
+            inputs=self.inputs[{axis: 0}],
+            outputs=rate,
+        )
+
 
 @dataclasses.dataclass(eq=False, repr=False)
 class TapData(
