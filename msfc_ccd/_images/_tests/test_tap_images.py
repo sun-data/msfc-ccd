@@ -56,6 +56,13 @@ class AbstractTestAbstractTapImage(
         assert result.shape[axis_tap_x] == a.shape[axis_tap_x]
         assert result.shape[axis_tap_y] == a.shape[axis_tap_y]
 
+    def test_bias_ignores_overscan(self, a: msfc_ccd.abc.AbstractTapData):
+        b = a.replace(outputs=a.outputs + 1000 * u.DN * a.where_overscan())
+        assert np.all(a.bias().outputs == b.bias().outputs)
+        assert np.all(
+            a.bias(num_overscan=None).outputs != b.bias(num_overscan=None).outputs
+        )
+
     def test_unbiased(self, a: msfc_ccd.abc.AbstractTapData):
         super().test_unbiased(a)
         result = a.unbiased
