@@ -70,6 +70,24 @@ class AbstractTestAbstractTapImage(
         assert na.unit(result.outputs) == na.unit(a.outputs)
         assert np.abs(result.outputs.mean()) < 1 * u.DN
 
+    def test_readout_noise(self, a: msfc_ccd.abc.AbstractTapData):
+        axis = "_test_readout_noise"
+        num = 5
+        sigma = 3 * u.DN
+        rng = np.random.default_rng(seed=42)
+        outputs = a.outputs + na.ScalarArray(
+            ndarray=rng.normal(size=(num,) + a.outputs.ndarray.shape) * sigma,
+            axes=(axis,) + a.outputs.axes,
+        )
+        outputs[{axis: 2, a.axis_x: 100, a.axis_y: 100}] = 60000 * u.DN
+        b = a.replace(outputs=outputs)
+        result = b.readout_noise(axis)
+        assert isinstance(result, msfc_ccd.TapData)
+        assert result.outputs.shape[axis] == num - 1
+        assert a.axis_x not in result.outputs.shape
+        assert a.axis_y not in result.outputs.shape
+        assert np.all(np.abs(result.outputs - sigma) < 0.05 * sigma)
+
     def test_active(self, a: msfc_ccd.abc.AbstractTapData):
         super().test_active(a)
         sensor = a.camera.sensor
