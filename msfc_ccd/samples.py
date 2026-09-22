@@ -12,7 +12,7 @@ __all__ = [
     "path_led_dark_esis1_next",
 ]
 
-path_fe55_esis1 = pathlib.Path(__file__).parent / "_data/fe55/ESIS1_00002.fit"
+path_fe55_esis1 = pathlib.Path(__file__).parent / "_data/fe55/ESIS1_00002.fit.gz"
 """
 An Fe 55 sample image from the ESIS channel 1 camera. 
 
@@ -20,7 +20,7 @@ Gathered by the MSFC sounding rocket team during camera testing and validation
 on 2017-07-06. 
 """
 
-path_fe55_esis3 = pathlib.Path(__file__).parent / "_data/fe55/ESIS3_05384.fit"
+path_fe55_esis3 = pathlib.Path(__file__).parent / "_data/fe55/ESIS3_05384.fit.gz"
 """
 An Fe 55 sample image from the ESIS channel 3 camera.
 

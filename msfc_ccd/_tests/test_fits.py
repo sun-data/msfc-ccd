@@ -1,5 +1,6 @@
 import pytest
 import pathlib
+import gzip
 import numpy as np
 import astropy.units as u
 import named_arrays as na
@@ -41,6 +42,20 @@ def test_open(path: str | pathlib.Path | na.AbstractScalarArray):
     assert np.all(header.status.ndarray == "Complete")
     assert np.all(header.sequence_number >= 0)
     assert np.all(header.count >= 0)
+
+
+def test_open_uncompressed(tmp_path: pathlib.Path):
+    """Every sample is compressed, so decompress one to cover plain FITS."""
+    path_compressed = msfc_ccd.samples.path_fe55_esis1
+    path = tmp_path / path_compressed.stem
+
+    with gzip.open(path_compressed, "rb") as f:
+        path.write_bytes(f.read())
+
+    result = msfc_ccd.fits.open(path)
+    assert isinstance(result, msfc_ccd.SensorData)
+    assert result.outputs.sum() != 0
+    assert np.all(result.outputs == msfc_ccd.fits.open(path_compressed).outputs)
 
 
 @pytest.mark.parametrize(
