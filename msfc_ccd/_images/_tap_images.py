@@ -208,6 +208,34 @@ class AbstractTapData(
             deviations from the median are rejected.
             The standard deviation used for the rejection is estimated from the
             median absolute deviation, which is not affected by the spikes.
+
+        Examples
+        --------
+        Estimate the readout noise of each tap from a pair of adjacent dark
+        images.
+
+        .. jupyter-execute::
+
+            import numpy as np
+            import named_arrays as na
+            import msfc_ccd
+
+            # Define the name of the time axis
+            axis_time = "time"
+
+            # Load two adjacent dark images as a sequence
+            darks = msfc_ccd.fits.open(
+                path=na.ScalarArray(
+                    ndarray=np.array([
+                        msfc_ccd.samples.path_led_dark_esis1,
+                        msfc_ccd.samples.path_led_dark_esis1_next,
+                    ]),
+                    axes=axis_time,
+                ),
+            )
+
+            # Estimate the readout noise of each tap
+            darks.taps.readout_noise(axis_time).outputs
         """
         outputs = self.active.outputs
         outputs_1 = outputs[{axis: slice(1, None)}]

@@ -9,6 +9,7 @@ __all__ = [
     "path_dark_esis3",
     "path_led_esis1",
     "path_led_dark_esis1",
+    "path_led_dark_esis1_next",
 ]
 
 path_fe55_esis1 = pathlib.Path(__file__).parent / "_data/fe55/ESIS1_00002.fit"
@@ -54,4 +55,14 @@ path_led_dark_esis1 = pathlib.Path(__file__).parent / "_data/led/ESIS1_04860.fit
 A sample dark image from the ESIS channel 1 camera.
 
 Gathered two minutes after :obj:`path_led_esis1`, with the LED turned off.
+"""
+
+path_led_dark_esis1_next = (
+    pathlib.Path(__file__).parent / "_data/led/ESIS1_04861.fit.gz"
+)
+"""
+The next dark image in the sequence after :obj:`path_led_dark_esis1`.
+
+Captured two seconds later, so the pair can be used to measure the
+readout noise of the camera.
 """
