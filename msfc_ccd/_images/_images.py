@@ -83,3 +83,44 @@ class AbstractCameraData(
             array=self,
             axis=(self.axis_x, self.axis_y),
         )
+
+    def dark(
+        self,
+        axis: str,
+        proportion: float = 0.25,
+    ) -> Self:
+        """
+        Estimate the master dark image of each tap from a sequence of dark images.
+
+        The master dark is the trimmed mean of the sequence along `axis`,
+        computed independently for each pixel.
+        Trimming the largest and smallest values rejects cosmic rays and
+        other spikes which affect a single image, while hot pixels and the
+        fixed pattern of the sensor, which are present in every image,
+        are preserved.
+
+        The images should have had their bias removed before calling this
+        method, so that the result can be subtracted from other images which
+        have had their bias removed in the same way.
+
+        Parameters
+        ----------
+        axis
+            The logical axis along which the images are a sequence of darks.
+        proportion
+            The fraction of the largest and smallest values to remove from each
+            pixel before taking the mean.
+            The number of images removed is rounded down,
+            so with fewer than ``1 / proportion`` images
+            nothing is removed.
+        """
+        outputs = na.mean_trimmed(
+            a=self.outputs,
+            q=proportion,
+            axis=axis,
+        )
+        return dataclasses.replace(
+            self,
+            inputs=self.inputs[{axis: 0}],
+            outputs=outputs,
+        )

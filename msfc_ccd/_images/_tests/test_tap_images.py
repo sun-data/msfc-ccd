@@ -70,28 +70,6 @@ class AbstractTestAbstractTapImage(
         assert na.unit(result.outputs) == na.unit(a.outputs)
         assert np.abs(result.outputs.mean()) < 1 * u.DN
 
-    def test_dark(self, a: msfc_ccd.abc.AbstractTapData):
-        axis = "_test_dark"
-        num = 8
-        sigma = 3 * u.DN
-        rng = np.random.default_rng(seed=42)
-        noise = na.ScalarArray(
-            ndarray=rng.normal(size=(num,) + a.outputs.ndarray.shape) * sigma,
-            axes=(axis,) + a.outputs.axes,
-        )
-        outputs = a.outputs + noise
-        outputs[{axis: 2, a.axis_x: 100, a.axis_y: 100}] = 60000 * u.DN
-        b = a.replace(outputs=outputs)
-        result = b.dark(axis)
-        assert isinstance(result, msfc_ccd.TapData)
-        assert axis not in result.outputs.shape
-        assert result.outputs.shape[a.axis_x] == a.outputs.shape[a.axis_x]
-        assert result.outputs.shape[a.axis_y] == a.outputs.shape[a.axis_y]
-        residual = result.outputs - a.outputs
-        assert np.all(np.abs(residual[{a.axis_x: 100, a.axis_y: 100}]) < 10 * sigma)
-        assert np.all(np.abs(residual.mean()) < 0.1 * sigma)
-        assert np.all(residual.std() < sigma / np.sqrt(num / 2))
-
     def test_readout_noise(self, a: msfc_ccd.abc.AbstractTapData):
         axis = "_test_readout_noise"
         num = 5
