@@ -1,5 +1,6 @@
 from typing_extensions import Self
 import dataclasses
+import numpy as np
 import named_arrays as na
 from .._cameras import AbstractCamera
 from ._vectors import ImageHeader
@@ -178,6 +179,58 @@ class AbstractTapData(
     @property
     def electrons(self) -> Self:
         return self.camera.dn_to_electrons(self)
+
+    def readout_noise(
+        self,
+        axis: str,
+        threshold: float = 5,
+    ) -> Self:
+        r"""
+        Estimate the readout noise of each tap from a sequence of dark images.
+
+        The difference between each image and the previous image along `axis`
+        is computed, which removes the bias, the dark current and the fixed
+        pattern noise, and leaves only the readout noise of the two images.
+        The readout noise is then the standard deviation of the active pixels
+        in each difference image, divided by :math:`\sqrt{2}`,
+        after rejecting pixels affected by cosmic rays or other spikes.
+
+        The result has one fewer element along `axis` than the input,
+        since it is defined for each pair of adjacent images.
+        Take the mean along `axis` to estimate the readout noise of the camera.
+
+        Parameters
+        ----------
+        axis
+            The logical axis along which the images are a sequence of darks.
+        threshold
+            Pixels in the difference image further than this many standard
+            deviations from the median are rejected.
+            The standard deviation used for the rejection is estimated from the
+            median absolute deviation, which is not affected by the spikes.
+        """
+        outputs = self.active.outputs
+        outputs_1 = outputs[{axis: slice(1, None)}]
+        outputs_0 = outputs[{axis: slice(None, -1)}]
+        difference = outputs_1 - outputs_0
+
+        axis_xy = (self.axis_x, self.axis_y)
+        median = np.median(difference, axis=axis_xy)
+        deviation = np.abs(difference - median)
+        mad = np.median(deviation, axis=axis_xy)
+
+        # The ratio of the standard deviation to the median absolute deviation
+        # for a normal distribution
+        factor = 1.482602218505602
+        where = deviation < threshold * factor * mad
+
+        std = difference.std(axis=axis_xy, where=where)
+
+        return dataclasses.replace(
+            self,
+            inputs=self.inputs[{axis: slice(1, None)}],
+            outputs=std / np.sqrt(2),
+        )
 
 
 @dataclasses.dataclass(eq=False, repr=False)

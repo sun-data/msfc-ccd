@@ -63,14 +63,23 @@ images side by side, each with its own bias and gain.
 :meth:`~msfc_ccd.SensorData.from_taps` reassembles one, flipping each quadrant
 back into the orientation of the sensor.
 
-**Blank and overscan columns measure the bias.**
+**Blank columns measure the bias.**
 Each tap reads out 50 blank columns before the light-sensitive pixels and 2
 overscan columns after them.
-Those columns see no light, so their mean is an estimate of the bias for that
-tap.
+The blank columns are read before any charge from the image, so the mean of
+the ones closest to the image is an estimate of the bias for that tap.
+The overscan columns are read after the image, and pick up charge deferred
+from its last column, so they are not used.
 :attr:`~msfc_ccd.abc.AbstractTapData.active` trims them away,
 :attr:`~msfc_ccd.abc.AbstractTapData.unbiased` subtracts the bias they measure,
 and the two compose: ``image.taps.unbiased.active``.
+
+**Readout noise comes from a sequence of darks.**
+Differencing two adjacent dark images cancels the bias, the dark current and
+the fixed pattern of the sensor, leaving only the readout noise of the two
+frames, so :meth:`~msfc_ccd.abc.AbstractTapData.readout_noise` estimates it
+from the active pixels of each difference rather than from the columns at the
+edge of a single frame.
 
 **Converting to electrons needs a gain.**
 :attr:`~msfc_ccd.abc.AbstractSensorData.electrons` multiplies by
@@ -136,6 +145,31 @@ Measure the bias of each tap, and remove it.
         vmin=-20,
         vmax=100,
     );
+
+|
+
+Measure the readout noise of each tap from a pair of adjacent dark images.
+
+.. jupyter-execute::
+
+    import numpy as np
+
+    # Define the name of the time axis
+    axis_time = "time"
+
+    # Load two adjacent dark images as a sequence
+    darks = msfc_ccd.fits.open(
+        path=na.ScalarArray(
+            ndarray=np.array([
+                msfc_ccd.samples.path_led_dark_esis1,
+                msfc_ccd.samples.path_led_dark_esis1_next,
+            ]),
+            axes=axis_time,
+        ),
+    )
+
+    # The difference of adjacent frames leaves only the readout noise
+    darks.taps.readout_noise(axis_time).outputs
 
 |
 
