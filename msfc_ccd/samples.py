@@ -10,6 +10,8 @@ __all__ = [
     "path_led_esis1",
     "path_led_dark_esis1",
     "path_led_dark_esis1_next",
+    "path_dark_2s_esis1",
+    "path_dark_12s_esis1",
 ]
 
 path_fe55_esis1 = pathlib.Path(__file__).parent / "_data/fe55/ESIS1_00002.fit.gz"
@@ -65,4 +67,24 @@ The next dark image in the sequence after :obj:`path_led_dark_esis1`.
 
 Captured two seconds later, so the pair can be used to measure the
 readout noise of the camera.
+"""
+
+path_dark_2s_esis1 = (
+    pathlib.Path(__file__).parent / "_data/dark_current/ESIS1_01772.fit.gz"
+)
+"""
+A two-second dark image from the ESIS channel 1 camera.
+
+Gathered by the MSFC sounding rocket team during the first dark test
+on 2017-07-12.
+"""
+
+path_dark_12s_esis1 = (
+    pathlib.Path(__file__).parent / "_data/dark_current/ESIS1_01829.fit.gz"
+)
+"""
+A twelve-second dark image from the ESIS channel 1 camera.
+
+Gathered eight minutes after :obj:`path_dark_2s_esis1`,
+so the pair can be used to measure the dark current rate of the camera.
 """

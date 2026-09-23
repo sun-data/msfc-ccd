@@ -88,6 +88,69 @@ class AbstractTestAbstractTapImage(
         assert a.axis_y not in result.outputs.shape
         assert np.all(np.abs(result.outputs - sigma) < 0.05 * sigma)
 
+    @classmethod
+    def _darks(
+        cls,
+        a: msfc_ccd.abc.AbstractTapData,
+        axis: str,
+        rate: u.Quantity,
+    ) -> msfc_ccd.abc.AbstractTapData:
+        """Build a sequence of darks with a known dark current rate."""
+        timedelta = na.ScalarArray(
+            ndarray=[2, 3, 4, 7, 12] * u.s,
+            axes=axis,
+        )
+
+        # The dark current accumulates only in the light-sensitive pixels,
+        # so the blank columns used for the bias are untouched.
+        where_active = ~(a.where_blank() | a.where_overscan())
+        outputs = a.outputs + rate * timedelta * where_active
+
+        # Cosmic rays, which arrive in proportion to the exposure time and so
+        # would otherwise be counted as dark current.
+        # They land only in the active pixels, since a cosmic ray in the blank
+        # columns would corrupt the bias instead.
+        rng = np.random.default_rng(seed=42)
+        shape = outputs.shape
+        num_blank = a.camera.sensor.num_blank
+        num_x = shape[a.axis_x] - num_blank - a.camera.sensor.num_overscan
+        num = np.round(10 * timedelta / timedelta[{axis: 0}]).astype(int)
+        for i in range(shape[axis]):
+            for _ in range(num[{axis: i}].ndarray.item()):
+                index = {
+                    axis: i,
+                    a.axis_x: num_blank + rng.integers(num_x).item(),
+                    a.axis_y: rng.integers(shape[a.axis_y]).item(),
+                }
+                outputs[index] = 60000 * u.DN
+
+        return a.replace(
+            inputs=a.inputs.replace(timedelta=timedelta),
+            outputs=outputs,
+        )
+
+    def test_dark_current(self, a: msfc_ccd.abc.AbstractTapData):
+        axis = "_test_dark_current"
+        rate = 0.05 * u.DN / u.s
+        result = self._darks(a, axis, rate).dark_current(axis)
+
+        assert isinstance(result, msfc_ccd.TapData)
+        assert axis not in result.outputs.shape
+        assert a.axis_x not in result.outputs.shape
+        assert a.axis_y not in result.outputs.shape
+        assert np.all(np.abs(result.outputs - rate) < 0.01 * rate)
+
+    def test_dark_current_linear(self, a: msfc_ccd.abc.AbstractTapData):
+        """The rate must not depend on which exposures were used."""
+        axis = "_test_dark_current_linear"
+        rate = 0.05 * u.DN / u.s
+        b = self._darks(a, axis, rate)
+
+        short = b[{axis: slice(None, 3)}].dark_current(axis)
+        long = b[{axis: slice(2, None)}].dark_current(axis)
+
+        assert np.all(np.abs(long.outputs - short.outputs) < 0.01 * rate)
+
     def test_active(self, a: msfc_ccd.abc.AbstractTapData):
         super().test_active(a)
         sensor = a.camera.sensor

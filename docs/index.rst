@@ -81,6 +81,16 @@ frames, so :meth:`~msfc_ccd.abc.AbstractTapData.readout_noise` estimates it
 from the active pixels of each difference rather than from the columns at the
 edge of a single frame.
 
+**Dark current needs a range of exposure lengths.**
+A two-second dark accumulates less than a tenth of a data number of dark
+current, far below the readout noise, so
+:meth:`~msfc_ccd.abc.AbstractTapData.dark_current` averages over all the
+active pixels of each image and fits the result against the measured exposure
+time of a set of darks taken at several exposure lengths.
+Only the slope of that fit is the dark current; the intercept also contains
+the offset between the blank columns and the active pixels, and the fixed
+pattern of the sensor.
+
 **Converting to electrons needs a gain.**
 :attr:`~msfc_ccd.abc.AbstractSensorData.electrons` multiplies by
 :attr:`msfc_ccd.Camera.gain`, which is usually different for each tap and has
@@ -170,6 +180,27 @@ Measure the readout noise of each tap from a pair of adjacent dark images.
 
     # The difference of adjacent frames leaves only the readout noise
     darks.taps.readout_noise(axis_time).outputs
+
+|
+
+Measure the dark current rate of each tap from a pair of dark images with
+different exposure lengths.
+
+.. jupyter-execute::
+
+    # Load a two-second dark image and a twelve-second dark image
+    darks = msfc_ccd.fits.open(
+        path=na.ScalarArray(
+            ndarray=np.array([
+                msfc_ccd.samples.path_dark_2s_esis1,
+                msfc_ccd.samples.path_dark_12s_esis1,
+            ]),
+            axes=axis_time,
+        ),
+    )
+
+    # The slope of the signal against the exposure time is the dark current
+    darks.taps.dark_current(axis_time).outputs.to("DN / s")
 
 |
 
