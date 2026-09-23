@@ -40,6 +40,12 @@ class AbstractTestAbstractTapImage(
         for s in result.ndarray.flat:
             assert isinstance(s, str)
 
+    def test_amplifier(self, a: msfc_ccd.abc.AbstractTapData):
+        result = a.amplifier
+        assert result.shape[a.axis_tap_x] == a.shape[a.axis_tap_x]
+        assert result.shape[a.axis_tap_y] == a.shape[a.axis_tap_y]
+        assert set(result.ndarray.flat) == {"1/E", "2/H", "3/G", "4/F"}
+
     def test_where_blank(self, a: msfc_ccd.abc.AbstractTapData):
         result = a.where_blank()
         assert result.sum() == a.camera.sensor.num_blank

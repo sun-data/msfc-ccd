@@ -50,6 +50,44 @@ class AbstractTapData(
         tap_y = self.tap[axis_tap_y].astype(str)
         return "tap (" + tap_x + ", " + tap_y + ")"
 
+    @property
+    def amplifier(self) -> na.ScalarArray:
+        """
+        The name each tap is known by at MSFC and Teledyne/e2v.
+
+        The four amplifiers of the sensor are lettered ``E``, ``F``, ``G``
+        and ``H``, and MSFC numbers the same four quadrants 1 to 4.
+        Their layout across the readout frame is
+
+        .. code-block:: text
+
+            +-------+-------+
+            |  2/H  |  3/G  |
+            +-------+-------+
+            |  1/E  |  4/F  |
+            +-------+-------+
+
+        with the first row read out at the bottom,
+        so ``1/E`` is ``(tap_y=0, tap_x=0)`` and ``3/G`` is
+        ``(tap_y=1, tap_x=1)``.
+        This is the mapping needed to compare a per-tap measurement against
+        the values MSFC published by quadrant number.
+
+        Examples
+        --------
+        .. jupyter-execute::
+
+            import msfc_ccd
+
+            image = msfc_ccd.fits.open(msfc_ccd.samples.path_fe55_esis3)
+
+            image.taps.amplifier.ndarray
+        """
+        return na.ScalarArray(
+            ndarray=np.array([["1/E", "4/F"], ["2/H", "3/G"]]),
+            axes=(self.axis_tap_y, self.axis_tap_x),
+        )
+
     def where_blank(
         self,
         num: None | int = None,
