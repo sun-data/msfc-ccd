@@ -148,7 +148,7 @@ Measure the bias of each tap, and remove it.
     taps = image.taps
 
     # Each tap has its own amplifier, and so its own bias
-    taps.bias().outputs
+    taps.bias().outputs.ndarray
 
 .. jupyter-execute::
 
@@ -191,7 +191,7 @@ Measure the readout noise of each tap from a pair of adjacent dark images.
     )
 
     # The difference of adjacent frames leaves only the readout noise
-    darks.taps.readout_noise(axis_time).outputs
+    darks.taps.readout_noise(axis_time).outputs.ndarray
 
 |
 
@@ -212,7 +212,7 @@ different exposure lengths.
     )
 
     # The slope of the signal against the exposure time is the dark current
-    darks.taps.dark_current(axis_time).outputs.to("DN / s")
+    darks.taps.dark_current(axis_time).outputs.to("DN / s").ndarray
 
 |
 
@@ -225,7 +225,7 @@ image into electrons.
     fe55 = msfc_ccd.fits.open(msfc_ccd.samples.path_fe55_esis3)
     gain = fe55.taps.gain().outputs
 
-    gain
+    gain.ndarray
 
 .. jupyter-execute::
 
@@ -236,7 +236,7 @@ image into electrons.
         camera=camera,
     )
 
-    calibrated.taps.unbiased.active.electrons.outputs.sum()
+    calibrated.taps.unbiased.active.electrons.outputs.sum().ndarray
 
 |
 

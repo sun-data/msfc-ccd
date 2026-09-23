@@ -390,7 +390,7 @@ class AbstractTapData(
 
             image = msfc_ccd.fits.open(msfc_ccd.samples.path_fe55_esis3)
 
-            image.taps.gain().outputs
+            image.taps.gain().outputs.ndarray
         """
         if fe55 is None:
             fe55 = Fe55()
@@ -503,7 +503,7 @@ class AbstractTapData(
             images = msfc_ccd.fits.open(path)
 
             # Estimate the dark current rate of each tap
-            images.taps.dark_current("time").outputs.to("DN / s")
+            images.taps.dark_current("time").outputs.to("DN / s").ndarray
 
         Two images give only a rough estimate, since the uncertainty in the
         bias of each image is about a tenth of the signal accumulated between
