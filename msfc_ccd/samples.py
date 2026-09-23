@@ -22,12 +22,12 @@ Gathered by the MSFC sounding rocket team during camera testing and validation
 on 2017-07-06. 
 """
 
-path_fe55_esis3 = pathlib.Path(__file__).parent / "_data/fe55/ESIS3_05384.fit.gz"
+path_fe55_esis3 = pathlib.Path(__file__).parent / "_data/fe55/ESIS3_05400.fit.gz"
 """
 An Fe 55 sample image from the ESIS channel 3 camera.
 
-Gathered by the MSFC sounding rocket team during camera testing and validation 
-on 2017-07-12. 
+Gathered by the MSFC sounding rocket team during camera testing and validation
+on 2017-07-12.
 """
 
 path_dark_esis1 = pathlib.Path(__file__).parent / "_data/darks/ESIS1_00099.fit.gz"

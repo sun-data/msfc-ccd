@@ -232,6 +232,107 @@ class AbstractTapData(
             outputs=std / np.sqrt(2),
         )
 
+    def hits(
+        self,
+        threshold: float = 5,
+    ) -> Self:
+        r"""
+        Find the isolated single-pixel events in each image.
+
+        An :math:`^{55}\text{Fe}` X-ray, or a cosmic ray arriving close to
+        normal incidence, deposits its charge in one pixel and the pixels
+        immediately around it.
+        This method finds every pixel more than `threshold` readout noises
+        above the dark level whose eight neighbors are all below that level,
+        and measures the charge of the event as the sum of the
+        :math:`3 \times 3` region centered on it.
+
+        The result has the shape of :attr:`active`, with the charge of each
+        event in the pixel where it landed and :obj:`numpy.nan` everywhere
+        else, so a sequence of images can be pooled by taking a histogram
+        along the sequence axis and the two detector axes.
+
+        The bias is removed, and then the median of the active pixels,
+        which removes the dark current and the fixed pattern of the sensor
+        to the accuracy needed to place the threshold.
+
+        Parameters
+        ----------
+        threshold
+            How many readout noises above the dark level a pixel must be to
+            start an event.
+            The readout noise is estimated from the median absolute deviation
+            of the active pixels, which is not moved by the events themselves.
+
+        Examples
+        --------
+        Plot the distribution of event charges for one tap of the ESIS
+        channel 3 camera.
+        The peak is the :math:`^{55}\text{Fe}` K-:math:`\alpha` line,
+        and the tail below it is the events which lost part of their charge.
+
+        .. jupyter-execute::
+
+            import matplotlib.pyplot as plt
+            import astropy.units as u
+            import named_arrays as na
+            import msfc_ccd
+
+            # Load a sample Fe 55 image and split it into taps
+            image = msfc_ccd.fits.open(msfc_ccd.samples.path_fe55_esis3)
+            taps = image.taps
+
+            # Find the isolated events
+            hits = taps.hits()
+
+            # Pool them into a histogram for each tap
+            hist = na.histogram(
+                a=hits.outputs,
+                bins={"charge": 26},
+                axis=hits.axis_xy,
+                min=0 * u.DN,
+                max=800 * u.DN,
+            )
+
+            fig, ax = plt.subplots(constrained_layout=True)
+            na.plt.stairs(
+                hist.inputs[{"tap_x": 0, "tap_y": 0}],
+                hist.outputs[{"tap_x": 0, "tap_y": 0}],
+                axis="charge",
+                ax=ax,
+                baseline=None,
+            )
+            ax.set_xlabel("charge in the 3x3 region (DN)")
+            ax.set_ylabel("number of events");
+        """
+        result = self.unbiased.active
+
+        outputs = result.outputs
+        outputs = outputs - np.median(outputs, axis=self.axis_xy)
+
+        # The readout noise, which the events themselves do not move
+        mad = np.median(np.abs(outputs), axis=self.axis_xy)
+        factor = 1.482602218505602
+        where_hot = outputs > (threshold * factor * mad)
+
+        # The charge of the event, and the number of hot pixels around it
+        size = {self.axis_x: 3, self.axis_y: 3}
+        charge = 9 * na.ndfilters.mean_filter(outputs, size=size)
+        num_hot = 9 * na.ndfilters.mean_filter(where_hot.astype(float), size=size)
+
+        # Events on the border have an incomplete 3x3 region
+        index_x = outputs.indices[self.axis_x]
+        index_y = outputs.indices[self.axis_y]
+        interior = (0 < index_x) & (index_x < (result.num_x - 1))
+        interior = interior & (0 < index_y) & (index_y < (result.num_y - 1))
+
+        where = where_hot & (num_hot < 1.5) & interior
+
+        return dataclasses.replace(
+            result,
+            outputs=charge * np.where(where, 1, np.nan),
+        )
+
     def dark_current(
         self,
         axis: str,

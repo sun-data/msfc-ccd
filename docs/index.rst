@@ -91,6 +91,17 @@ Only the slope of that fit is the dark current; the intercept also contains
 the offset between the blank columns and the active pixels, and the fixed
 pattern of the sensor.
 
+**Fe 55 events are isolated single-pixel hits.**
+A 5.9 keV X-ray from an :math:`^{55}\text{Fe}` source releases a known number
+of electrons in one pixel, so the charge it leaves is a ruler for the gain.
+:meth:`~msfc_ccd.abc.AbstractTapData.hits` finds every pixel far enough above
+the dark level whose eight neighbors are not, and measures the charge of the
+event as the sum of the surrounding three by three region, which recovers the
+charge that spilled into the neighbors.
+It returns an image of the same shape with the charge of each event in place
+and :obj:`numpy.nan` elsewhere, so a sequence of images is pooled by taking a
+histogram along the sequence axis and the two detector axes.
+
 **Converting to electrons needs a gain.**
 :attr:`~msfc_ccd.abc.AbstractSensorData.electrons` multiplies by
 :attr:`msfc_ccd.Camera.gain`, which is usually different for each tap and has
