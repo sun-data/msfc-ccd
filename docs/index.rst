@@ -74,6 +74,16 @@ from its last column, so they are not used.
 :attr:`~msfc_ccd.abc.AbstractTapData.unbiased` subtracts the bias they measure,
 and the two compose: ``image.taps.unbiased.active``.
 
+**The first rows of each tap are masked.**
+Each tap also reads out 8 masked rows before the image,
+:attr:`~msfc_ccd.TeledyneCCD230.num_masked`.
+Their charge comes from the part of the frame store beside the image area,
+under the edge of the mask, so they receive only the light that leaks past the
+edge and they accumulate dark current about 80 times faster than the image.
+:attr:`~msfc_ccd.abc.AbstractTapData.active` keeps them, since a misaligned
+mask can let real signal reach them, and
+:meth:`~msfc_ccd.abc.AbstractTapData.where_masked` selects them.
+
 **Readout noise comes from a sequence of darks.**
 Differencing two adjacent dark images cancels the bias, the dark current and
 the fixed pattern of the sensor, leaving only the readout noise of the two
@@ -85,8 +95,9 @@ edge of a single frame.
 A two-second dark accumulates less than a tenth of a data number of dark
 current, far below the readout noise, so
 :meth:`~msfc_ccd.abc.AbstractTapData.dark_current` averages over all the
-active pixels of each image and fits the result against the measured exposure
-time of a set of darks taken at several exposure lengths.
+active pixels of each image outside the masked rows and fits the result
+against the measured exposure time of a set of darks taken at several exposure
+lengths.
 Only the slope of that fit is the dark current; the intercept also contains
 the offset between the blank columns and the active pixels, and the fixed
 pattern of the sensor.

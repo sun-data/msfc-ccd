@@ -136,6 +136,16 @@ class AbstractTapData(
 
         return lower & upper
 
+    def where_masked(self) -> na.ScalarArray:
+        """
+        Create a boolean array which is :obj:`True` for all the masked rows.
+
+        See :attr:`msfc_ccd.TeledyneCCD230.num_masked` for how these rows
+        differ from the rest of the image.
+        """
+        i = self.outputs.indices[self.axis_y]
+        return i < self.camera.sensor.num_masked
+
     def bias(
         self,
         num_blank: None | int = 25,
@@ -479,6 +489,13 @@ class AbstractTapData(
         against the measured exposure time of each image,
         :attr:`msfc_ccd.ImageHeader.timedelta`.
 
+        The masked rows at the start of each tap, :meth:`where_masked`,
+        are left out of the mean.
+        They hold charge from the frame store rather than from the image area,
+        and their dark current rate is about 80 times higher,
+        so although they are less than two percent of the active pixels,
+        including them would roughly double the result.
+
         The intercept of the fit is discarded.
         The blank columns used to compute the bias are offset from the dark
         level of the active pixels by about 1 DN,
@@ -487,7 +504,7 @@ class AbstractTapData(
         Only the slope is independent of both.
 
         The dark current accumulated during a single image is much smaller
-        than the readout noise, about 0.07 DN in a two-second image,
+        than the readout noise, about 0.05 DN in a two-second image,
         so it is only measurable after averaging over all the active pixels,
         and a long exposure is needed to separate it from the bias.
 
@@ -497,28 +514,14 @@ class AbstractTapData(
             The logical axis along which the images are a sequence of darks.
         proportion
             The fraction of the brightest and darkest active pixels to remove
-            from each image before taking the mean.
+            from each image before taking the mean,
+            which protects the mean from cosmic rays.
 
-            The default removes the cosmic rays and leaves everything else.
-            Cosmic rays accumulate in proportion to the exposure time,
-            so without any trimming they enter the slope directly and the
-            signal grows faster than the dark current does.
-
-            Trimming much harder than the default removes the hot pixels too,
-            which changes what is being measured.
-            Each pixel has its own dark current rate,
-            so as the exposure time grows the brightest pixels are
-            increasingly the ones with the highest rates,
-            and a heavy trim follows a progressively cooler subset of the
-            sensor.
-            The result is then the rate of a typical pixel rather than the
-            mean over the sensor, and it no longer grows linearly with the
-            exposure time, which makes the slope of the fit depend on which
-            exposures were used.
-            Measured on the dark tests of 2017-07-12, the slope between 4 and
-            12 seconds is 1.44 times the slope between 2 and 4 seconds with no
-            trimming, 1.01 times at the default, and 0.66 times at a
-            proportion of 0.25.
+            On the dark tests of 2017-07-12, cosmic rays are too rare to
+            matter, and the result is the same to within one percent for any
+            proportion from 0 to 0.05.
+            Trimming much harder removes the hot pixels too,
+            which are part of the dark current.
 
         Examples
         --------
@@ -545,13 +548,17 @@ class AbstractTapData(
             images.taps.dark_current("time").outputs.to("DN / s").ndarray
 
         Two images give only a rough estimate, since the uncertainty in the
-        bias of each image is about a tenth of the signal accumulated between
+        bias of each image is about a fifth of the signal accumulated between
         them.
         Averaging many images at each of five exposure lengths gives
-        0.038 to 0.042 DN / s across the four taps of this camera.
+        0.020 to 0.025 DN / s across the four taps of this camera,
+        within six percent of the independent analysis of the same test by
+        MSFC.
         """
+        num_masked = self.camera.sensor.num_masked
+        signal = self.unbiased.active.outputs[{self.axis_y: slice(num_masked, None)}]
         signal = na.mean_trimmed(
-            a=self.unbiased.active.outputs,
+            a=signal,
             q=proportion,
             axis=self.axis_xy,
         )

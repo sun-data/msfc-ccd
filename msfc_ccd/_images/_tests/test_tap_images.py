@@ -54,6 +54,11 @@ class AbstractTestAbstractTapImage(
         result = a.where_overscan()
         assert result.sum() == a.camera.sensor.num_overscan
 
+    def test_where_masked(self, a: msfc_ccd.abc.AbstractTapData):
+        result = a.where_masked()
+        assert result.sum() == a.camera.sensor.num_masked
+        assert result[{a.axis_y: 0}]
+
     def test_bias(self, a: msfc_ccd.abc.AbstractTapData):
         result = a.bias()
         axis_tap_x = a.camera.axis_tap_x
@@ -218,6 +223,21 @@ class AbstractTestAbstractTapImage(
         assert axis not in result.outputs.shape
         assert a.axis_x not in result.outputs.shape
         assert a.axis_y not in result.outputs.shape
+        assert np.all(np.abs(result.outputs - rate) < 0.01 * rate)
+
+    def test_dark_current_ignores_masked(self, a: msfc_ccd.abc.AbstractTapData):
+        """The masked rows accumulate dark current much faster than the image."""
+        axis = "_test_dark_current_ignores_masked"
+        rate = 0.05 * u.DN / u.s
+        b = self._darks(a, axis, rate)
+
+        # Only the light-sensitive part of the masked rows, since the blank
+        # columns are clocked out of the serial register.
+        where_active = ~(b.where_blank() | b.where_overscan())
+        where = b.where_masked() & where_active
+        b = b.replace(outputs=b.outputs + 100 * rate * b.inputs.timedelta * where)
+        result = b.dark_current(axis)
+
         assert np.all(np.abs(result.outputs - rate) < 0.01 * rate)
 
     def test_dark_current_linear(self, a: msfc_ccd.abc.AbstractTapData):
