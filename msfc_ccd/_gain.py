@@ -25,6 +25,10 @@ class Fe55:
     sensors, so the charge that an X-ray releases is a ruler which can be
     used to measure the gain.
 
+    How much charge that is depends on the temperature of the sensor,
+    through the energy needed to create one electron-hole pair, so
+    :attr:`temperature` has to be set to the temperature the sensor was at.
+
     Examples
     --------
     The number of electrons released by each line.
@@ -37,6 +41,17 @@ class Fe55:
 
         print(f"K-alpha: {fe55.energy_k_alpha:0.4f} -> {fe55.charge_k_alpha:0.1f}")
         print(f"K-beta:  {fe55.energy_k_beta:0.4f} -> {fe55.charge_k_beta:0.1f}")
+
+    Warming the sensor to room temperature would change the answer by
+    almost a percent.
+
+    .. jupyter-execute::
+
+        import astropy.units as u
+
+        warm = msfc_ccd.Fe55(temperature=300 * u.K)
+
+        print(f"{warm.charge_k_alpha:0.1f} at {warm.temperature}")
     """
 
     probability_k_alpha_1: float = 0.162
@@ -57,6 +72,16 @@ class Fe55:
     energy_k_beta: u.Quantity = 6.49045 * u.keV
     r"""The energy of the K-:math:`\beta` X-rays."""
 
+    temperature: u.Quantity = -55 * u.deg_C
+    """
+    The temperature of the sensor when the exposure was gathered.
+
+    The default is the temperature the ESIS cameras are designed to run at.
+    The energy needed to create one electron-hole pair falls as silicon
+    warms, so a sensor at room temperature would release almost a percent
+    more charge for the same X-ray.
+    """
+
     @property
     def probability_k_alpha(self) -> float:
         r"""
@@ -76,14 +101,16 @@ class Fe55:
         e_2 = self.energy_k_alpha_2
         return (p_1 * e_1 + p_2 * e_2) / (p_1 + p_2)
 
-    @staticmethod
-    def _charge(energy: u.Quantity) -> u.Quantity:
+    def _charge(self, energy: u.Quantity) -> u.Quantity:
         # `quantum_yield_ideal` divides by zero on its way to the answer,
         # which is harmless but would otherwise warn on every call and show
         # up as a stderr cell in the documentation.
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", RuntimeWarning)
-            result = optika.sensors.quantum_yield_ideal(energy)
+            result = optika.sensors.quantum_yield_ideal(
+                wavelength=energy,
+                temperature=self.temperature,
+            )
         return (result.ndarray * u.ph) << u.electron
 
     @property
