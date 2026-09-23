@@ -51,6 +51,10 @@ class AbstractTestAbstractSensor(
         assert isinstance(a.num_overscan, int)
         assert a.num_overscan > 0
 
+    def test_num_masked(self, a: msfc_ccd.abc.AbstractSensor):
+        assert isinstance(a.num_masked, int)
+        assert a.num_masked > 0
+
     def test_cte(self, a: msfc_ccd.abc.AbstractSensor):
         assert a.cte > 0
 

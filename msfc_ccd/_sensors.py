@@ -76,6 +76,11 @@ class AbstractSensor(
 
     @property
     @abc.abstractmethod
+    def num_masked(self) -> int:
+        """The number of masked rows at the start of each tap."""
+
+    @property
+    @abc.abstractmethod
     def cte(self) -> u.Quantity:
         """The charge transfer efficiency of the sensor."""
 
@@ -147,6 +152,18 @@ class TeledyneCCD230(
 
     num_overscan: int = 2
     """The number of overscan columns at the end of each row."""
+
+    num_masked: int = 8
+    """
+    The number of masked rows at the start of each tap.
+
+    These rows are read out before the image, but they hold charge from the
+    part of the frame store closest to the image area rather than light from
+    the image itself.
+    They lie under the edge of the mask, so they have a dark current rate
+    about 80 times that of the image area, and they receive a fraction of
+    the light that leaks under the edge of the mask.
+    """
 
     cte: u.Quantity = 99.9995 * u.percent
     """The charge transfer efficiency of the sensor."""
