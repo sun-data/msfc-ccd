@@ -295,6 +295,7 @@ justify the decisions made in this package.
 
     reports/bias
     reports/dark-current
+    reports/gain
 
 |
 

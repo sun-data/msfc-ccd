@@ -5,6 +5,7 @@ import pathlib
 __all__ = [
     "path_fe55_esis1",
     "path_fe55_esis3",
+    "paths_fe55_esis3",
     "path_dark_esis1",
     "path_dark_esis3",
     "path_led_esis1",
@@ -28,6 +29,19 @@ An Fe 55 sample image from the ESIS channel 3 camera.
 
 Gathered by the MSFC sounding rocket team during camera testing and validation
 on 2017-07-12.
+"""
+
+paths_fe55_esis3 = tuple(
+    pathlib.Path(__file__).parent / f"_data/fe55/ESIS3_{i:05d}.fit.gz"
+    for i in (5400, 5408, 5416, 5424)
+)
+"""
+A sequence of four Fe 55 images from the ESIS channel 3 camera,
+beginning with :obj:`path_fe55_esis3`.
+
+A single image holds only a few tens of Fe 55 events in each tap.
+Four is enough for the gain of every tap to settle to within about half a
+percent of the value measured from forty.
 """
 
 path_dark_esis1 = pathlib.Path(__file__).parent / "_data/darks/ESIS1_00099.fit.gz"
