@@ -55,13 +55,24 @@ class Fe55:
     """
 
     probability_k_alpha_1: float = 0.162
-    r"""The probability of emitting a K-:math:`\alpha_1` X-ray."""
+    r"""
+    The probability of emitting a K-:math:`\alpha_1` X-ray.
+
+    This and :attr:`probability_k_alpha_2` sum to 0.244, against the
+    0.245 (7) measured by :cite:t:`Schotzig2000`.
+    """
 
     probability_k_alpha_2: float = 0.082
     r"""The probability of emitting a K-:math:`\alpha_2` X-ray."""
 
-    probability_k_beta: float = 0.0285
-    r"""The probability of emitting a K-:math:`\beta` X-ray."""
+    probability_k_beta: float = 0.0338
+    r"""
+    The probability of emitting a K-:math:`\beta` X-ray.
+
+    The 0.0338 (9) measured by :cite:t:`Schotzig2000`, summed over the
+    K-:math:`\beta_{1,3}` and K-:math:`\beta_5` components, which these
+    sensors cannot resolve from one another.
+    """
 
     energy_k_alpha_1: u.Quantity = 5.89875 * u.keV
     r"""The energy of the K-:math:`\alpha_1` X-rays."""
