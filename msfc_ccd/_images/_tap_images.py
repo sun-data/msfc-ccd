@@ -53,12 +53,12 @@ class AbstractTapData(
     @property
     def amplifier(self) -> na.ScalarArray:
         """
-        The name each tap is known by at MSFC.
+        The name each tap is known by.
 
-        MSFC numbers the four quadrants 1 to 4 and also letters them ``E``
-        to ``H``, after the four output amplifiers of the sensor.
-        Both names, and the layout below, are taken from their calibration
-        library, which draws it as
+        ``E``, ``F``, ``G`` and ``H`` are the four output amplifiers of the
+        sensor, named as on page 16 of the datasheet, and MSFC numbers the
+        same four quadrants 1 to 4.
+        Their layout across the readout frame is
 
         .. code-block:: text
 
