@@ -124,6 +124,38 @@ class AbstractTestAbstractTapImage(
         i = {a.axis_x: index_pair[a.axis_x] - num_blank, a.axis_y: index_pair[a.axis_y]}
         assert not np.any(np.isfinite(result.outputs[i]))
 
+    def test_gain(self, a: msfc_ccd.abc.AbstractTapData):
+        gain = 2.5 * u.electron / u.DN
+        fe55 = msfc_ccd.Fe55()
+        rng = np.random.default_rng(seed=42)
+
+        num_blank = a.camera.sensor.num_blank
+        num_x, num_y, step = 30, 15, 33
+
+        # Fe 55 events on a grid, spaced far enough apart to stay isolated
+        probability_beta = fe55.probability_k_beta / (
+            fe55.probability_k_alpha + fe55.probability_k_beta
+        )
+        where_beta = rng.random(size=(num_x, num_y)) < probability_beta
+        charge = np.where(where_beta, fe55.charge_k_beta, fe55.charge_k_alpha)
+        charge = charge / gain + rng.normal(scale=14, size=charge.shape) * u.DN
+        charge = na.ScalarArray(charge, axes=(a.axis_x, a.axis_y))
+
+        index = {
+            a.axis_x: slice(num_blank + 8, num_blank + 8 + num_x * step, step),
+            a.axis_y: slice(8, 8 + num_y * step, step),
+        }
+        outputs = a.outputs.copy()
+        outputs[index] = outputs[index] + charge
+
+        result = a.replace(outputs=outputs).gain()
+
+        assert isinstance(result, msfc_ccd.TapData)
+        assert a.axis_x not in result.outputs.shape
+        assert a.axis_y not in result.outputs.shape
+        assert na.unit(result.outputs).is_equivalent(u.electron / u.DN)
+        assert np.all(np.abs(result.outputs - gain) < 0.02 * gain)
+
     @classmethod
     def _darks(
         cls,

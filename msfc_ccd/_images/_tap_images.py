@@ -1,8 +1,10 @@
 from typing_extensions import Self
 import dataclasses
 import numpy as np
+import astropy.units as u
 import named_arrays as na
 from .._cameras import AbstractCamera
+from .._gain import Fe55, _fit_gain
 from ._vectors import ImageHeader
 from ._images import AbstractCameraData
 
@@ -331,6 +333,96 @@ class AbstractTapData(
         return dataclasses.replace(
             result,
             outputs=charge * np.where(where, 1, np.nan),
+        )
+
+    def gain(
+        self,
+        threshold: float = 5,
+        gain_min: u.Quantity = 2 * u.electron / u.DN,
+        gain_max: u.Quantity = 5 * u.electron / u.DN,
+        fe55: None | Fe55 = None,
+    ) -> Self:
+        r"""
+        Measure the gain of each tap from one or more Fe 55 exposures.
+
+        The isolated events found by :meth:`hits` are pooled over every axis
+        except the two tap axes, and the gain of each tap is fit to the
+        charges of those events.
+
+        The model is a pair of Gaussians, one for each
+        :math:`^{55}\text{Fe}` line, whose separation and relative height are
+        fixed by the line energies and the emission probabilities, on a flat
+        background of events which lost part of their charge to a neighboring
+        pixel or to the surface.
+        The only free parameters are the gain, the width of the lines and the
+        size of that background.
+        The fit is an unbinned maximum likelihood, so there is no bin width to
+        choose, which matters because a single image yields only a few tens of
+        events per tap.
+
+        Parameters
+        ----------
+        threshold
+            Passed to :meth:`hits`.
+        gain_min
+            The smallest gain to consider.
+            This and `gain_max` bracket where the K-:math:`\alpha` peak can
+            lie, which is what lets the peak be found without a starting
+            guess.
+        gain_max
+            The largest gain to consider.
+        fe55
+            The properties of the :math:`^{55}\text{Fe}` source.
+            If :obj:`None`, :class:`msfc_ccd.Fe55` is used.
+
+        Returns
+        -------
+        A copy of these images where the outputs are the gain of each tap,
+        or :obj:`numpy.nan` for a tap with too few events to fit.
+
+        Examples
+        --------
+        Measure the gain of the ESIS channel 3 camera.
+
+        .. jupyter-execute::
+
+            import msfc_ccd
+
+            image = msfc_ccd.fits.open(msfc_ccd.samples.path_fe55_esis3)
+
+            image.taps.gain().outputs
+        """
+        if fe55 is None:
+            fe55 = Fe55()
+
+        hits = self.hits(threshold)
+
+        unit = u.electron / u.DN
+        gain_min = gain_min.to_value(unit)
+        gain_max = gain_max.to_value(unit)
+
+        charge = hits.outputs
+        axes = tuple(charge.shape)
+        axes_tap = tuple(a for a in (self.axis_tap_y, self.axis_tap_x) if a in axes)
+        axes_pooled = tuple(a for a in axes if a not in axes_tap)
+
+        shape_tap = tuple(charge.shape[a] for a in axes_tap)
+        ndarray = charge.ndarray_aligned(axes_tap + axes_pooled)
+        ndarray = ndarray.to_value(u.DN).reshape(shape_tap + (-1,))
+
+        result = np.empty(shape_tap)
+        for index in np.ndindex(*shape_tap):
+            result[index] = _fit_gain(
+                charge=ndarray[index],
+                gain_min=gain_min,
+                gain_max=gain_max,
+                fe55=fe55,
+            )
+
+        return dataclasses.replace(
+            self,
+            inputs=self.inputs[{a: 0 for a in axes_pooled}],
+            outputs=na.ScalarArray(result * unit, axes=axes_tap),
         )
 
     def dark_current(

@@ -109,8 +109,9 @@ to be measured.
 A :class:`msfc_ccd.Camera` constructed without one, which is what
 :func:`msfc_ccd.fits.open` uses by default, has no gain to apply, and raises a
 :class:`ValueError` naming the missing parameter rather than guessing.
-Supply your measured value with ``msfc_ccd.Camera(gain=...)`` before
-converting, remembering that the gain differs from tap to tap.
+:meth:`~msfc_ccd.abc.AbstractTapData.gain` measures it from an
+:math:`^{55}\text{Fe}` exposure, and the result goes straight into
+``msfc_ccd.Camera(gain=...)``.
 
 
 Examples
@@ -212,6 +213,30 @@ different exposure lengths.
 
     # The slope of the signal against the exposure time is the dark current
     darks.taps.dark_current(axis_time).outputs.to("DN / s")
+
+|
+
+Measure the gain of each tap from an Fe 55 exposure, and use it to convert an
+image into electrons.
+
+.. jupyter-execute::
+
+    # Load an Fe 55 exposure and measure the gain of each tap
+    fe55 = msfc_ccd.fits.open(msfc_ccd.samples.path_fe55_esis3)
+    gain = fe55.taps.gain().outputs
+
+    gain
+
+.. jupyter-execute::
+
+    # Build a camera with that gain, and reload the image through it
+    camera = msfc_ccd.Camera(gain=gain)
+    calibrated = msfc_ccd.fits.open(
+        path=msfc_ccd.samples.path_fe55_esis3,
+        camera=camera,
+    )
+
+    calibrated.taps.unbiased.active.electrons.outputs.sum()
 
 |
 
