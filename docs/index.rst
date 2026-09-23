@@ -91,6 +91,17 @@ Only the slope of that fit is the dark current; the intercept also contains
 the offset between the blank columns and the active pixels, and the fixed
 pattern of the sensor.
 
+**Fe 55 events are isolated single-pixel hits.**
+A 5.9 keV X-ray from an :math:`^{55}\text{Fe}` source releases a known number
+of electrons in one pixel, so the charge it leaves is a ruler for the gain.
+:meth:`~msfc_ccd.abc.AbstractTapData.hits` finds every pixel far enough above
+the dark level whose eight neighbors are not, and measures the charge of the
+event as the sum of the surrounding three by three region, which recovers the
+charge that spilled into the neighbors.
+It returns an image of the same shape with the charge of each event in place
+and :obj:`numpy.nan` elsewhere, so a sequence of images is pooled by taking a
+histogram along the sequence axis and the two detector axes.
+
 **Converting to electrons needs a gain.**
 :attr:`~msfc_ccd.abc.AbstractSensorData.electrons` multiplies by
 :attr:`msfc_ccd.Camera.gain`, which is usually different for each tap and has
@@ -98,8 +109,9 @@ to be measured.
 A :class:`msfc_ccd.Camera` constructed without one, which is what
 :func:`msfc_ccd.fits.open` uses by default, has no gain to apply, and raises a
 :class:`ValueError` naming the missing parameter rather than guessing.
-Supply your measured value with ``msfc_ccd.Camera(gain=...)`` before
-converting, remembering that the gain differs from tap to tap.
+:meth:`~msfc_ccd.abc.AbstractTapData.gain` measures it from an
+:math:`^{55}\text{Fe}` exposure, and the result goes straight into
+``msfc_ccd.Camera(gain=...)``.
 
 
 Examples
@@ -136,7 +148,7 @@ Measure the bias of each tap, and remove it.
     taps = image.taps
 
     # Each tap has its own amplifier, and so its own bias
-    taps.bias().outputs
+    taps.bias().outputs.ndarray
 
 .. jupyter-execute::
 
@@ -179,7 +191,7 @@ Measure the readout noise of each tap from a pair of adjacent dark images.
     )
 
     # The difference of adjacent frames leaves only the readout noise
-    darks.taps.readout_noise(axis_time).outputs
+    darks.taps.readout_noise(axis_time).outputs.ndarray
 
 |
 
@@ -200,7 +212,31 @@ different exposure lengths.
     )
 
     # The slope of the signal against the exposure time is the dark current
-    darks.taps.dark_current(axis_time).outputs.to("DN / s")
+    darks.taps.dark_current(axis_time).outputs.to("DN / s").ndarray
+
+|
+
+Measure the gain of each tap from an Fe 55 exposure, and use it to convert an
+image into electrons.
+
+.. jupyter-execute::
+
+    # Load an Fe 55 exposure and measure the gain of each tap
+    fe55 = msfc_ccd.fits.open(msfc_ccd.samples.path_fe55_esis3)
+    gain = fe55.taps.gain().outputs
+
+    gain.ndarray
+
+.. jupyter-execute::
+
+    # Build a camera with that gain, and reload the image through it
+    camera = msfc_ccd.Camera(gain=gain)
+    calibrated = msfc_ccd.fits.open(
+        path=msfc_ccd.samples.path_fe55_esis3,
+        camera=camera,
+    )
+
+    calibrated.taps.unbiased.active.electrons.outputs.sum().ndarray
 
 |
 
@@ -259,6 +295,7 @@ justify the decisions made in this package.
 
     reports/bias
     reports/dark-current
+    reports/gain
 
 |
 

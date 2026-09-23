@@ -1,8 +1,10 @@
 from typing_extensions import Self
 import dataclasses
 import numpy as np
+import astropy.units as u
 import named_arrays as na
 from .._cameras import AbstractCamera
+from .._gain import Fe55, _fit_gain
 from ._vectors import ImageHeader
 from ._images import AbstractCameraData
 
@@ -47,6 +49,45 @@ class AbstractTapData(
         tap_x = self.tap[axis_tap_x].astype(str).astype(object)
         tap_y = self.tap[axis_tap_y].astype(str)
         return "tap (" + tap_x + ", " + tap_y + ")"
+
+    @property
+    def amplifier(self) -> na.ScalarArray:
+        """
+        The name each tap is known by.
+
+        ``E``, ``F``, ``G`` and ``H`` are the four output amplifiers of the
+        sensor, named as on page 16 of the datasheet, and MSFC numbers the
+        same four quadrants 1 to 4.
+        Their layout across the readout frame is
+
+        .. code-block:: text
+
+            +-------+-------+
+            |  2/H  |  3/G  |
+            +-------+-------+
+            |  1/E  |  4/F  |
+            +-------+-------+
+
+        with the first row read out at the bottom,
+        so ``1/E`` is ``(tap_y=0, tap_x=0)`` and ``3/G`` is
+        ``(tap_y=1, tap_x=1)``.
+        This is the mapping needed to compare a per-tap measurement against
+        the values MSFC published by quadrant number.
+
+        Examples
+        --------
+        .. jupyter-execute::
+
+            import msfc_ccd
+
+            image = msfc_ccd.fits.open(msfc_ccd.samples.path_fe55_esis3)
+
+            image.taps.amplifier.ndarray
+        """
+        return na.ScalarArray(
+            ndarray=np.array([["1/E", "4/F"], ["2/H", "3/G"]]),
+            axes=(self.axis_tap_y, self.axis_tap_x),
+        )
 
     def where_blank(
         self,
@@ -232,6 +273,197 @@ class AbstractTapData(
             outputs=std / np.sqrt(2),
         )
 
+    def hits(
+        self,
+        threshold: float = 5,
+    ) -> Self:
+        r"""
+        Find the isolated single-pixel events in each image.
+
+        An :math:`^{55}\text{Fe}` X-ray, or a cosmic ray arriving close to
+        normal incidence, deposits its charge in one pixel and the pixels
+        immediately around it.
+        This method finds every pixel more than `threshold` readout noises
+        above the dark level whose eight neighbors are all below that level,
+        and measures the charge of the event as the sum of the
+        :math:`3 \times 3` region centered on it.
+
+        The result has the shape of :attr:`active`, with the charge of each
+        event in the pixel where it landed and :obj:`numpy.nan` everywhere
+        else, so a sequence of images can be pooled by taking a histogram
+        along the sequence axis and the two detector axes.
+
+        The bias is removed, and then the median of the active pixels,
+        which removes the dark current and the fixed pattern of the sensor
+        to the accuracy needed to place the threshold.
+
+        Parameters
+        ----------
+        threshold
+            How many readout noises above the dark level a pixel must be to
+            start an event.
+            The readout noise is estimated from the median absolute deviation
+            of the active pixels, which is not moved by the events themselves.
+
+        Examples
+        --------
+        Plot the distribution of event charges for one tap of the ESIS
+        channel 3 camera.
+        The peak is the :math:`^{55}\text{Fe}` K-:math:`\alpha` line,
+        and the tail below it is the events which lost part of their charge.
+
+        .. jupyter-execute::
+
+            import matplotlib.pyplot as plt
+            import astropy.units as u
+            import named_arrays as na
+            import msfc_ccd
+
+            # Load a sample Fe 55 image and split it into taps
+            image = msfc_ccd.fits.open(msfc_ccd.samples.path_fe55_esis3)
+            taps = image.taps
+
+            # Find the isolated events
+            hits = taps.hits()
+
+            # Pool them into a histogram for each tap
+            hist = na.histogram(
+                a=hits.outputs,
+                bins={"charge": 26},
+                axis=hits.axis_xy,
+                min=0 * u.DN,
+                max=800 * u.DN,
+            )
+
+            fig, ax = plt.subplots(constrained_layout=True)
+            na.plt.stairs(
+                hist.inputs[{"tap_x": 0, "tap_y": 0}],
+                hist.outputs[{"tap_x": 0, "tap_y": 0}],
+                axis="charge",
+                ax=ax,
+                baseline=None,
+            )
+            ax.set_xlabel("charge in the 3x3 region (DN)")
+            ax.set_ylabel("number of events");
+        """
+        result = self.unbiased.active
+
+        outputs = result.outputs
+        outputs = outputs - np.median(outputs, axis=self.axis_xy)
+
+        # The readout noise, which the events themselves do not move
+        mad = np.median(np.abs(outputs), axis=self.axis_xy)
+        factor = 1.482602218505602
+        where_hot = outputs > (threshold * factor * mad)
+
+        # The charge of the event, and the number of hot pixels around it
+        size = {self.axis_x: 3, self.axis_y: 3}
+        charge = 9 * na.ndfilters.mean_filter(outputs, size=size)
+        num_hot = 9 * na.ndfilters.mean_filter(where_hot.astype(float), size=size)
+
+        # Events on the border have an incomplete 3x3 region
+        index_x = outputs.indices[self.axis_x]
+        index_y = outputs.indices[self.axis_y]
+        interior = (0 < index_x) & (index_x < (result.num_x - 1))
+        interior = interior & (0 < index_y) & (index_y < (result.num_y - 1))
+
+        where = where_hot & (num_hot < 1.5) & interior
+
+        return dataclasses.replace(
+            result,
+            outputs=charge * np.where(where, 1, np.nan),
+        )
+
+    def gain(
+        self,
+        threshold: float = 5,
+        gain_min: u.Quantity = 2 * u.electron / u.DN,
+        gain_max: u.Quantity = 5 * u.electron / u.DN,
+        fe55: None | Fe55 = None,
+    ) -> Self:
+        r"""
+        Measure the gain of each tap from one or more Fe 55 exposures.
+
+        The isolated events found by :meth:`hits` are pooled over every axis
+        except the two tap axes, and the gain of each tap is fit to the
+        charges of those events.
+
+        The model is a pair of Gaussians, one for each
+        :math:`^{55}\text{Fe}` line, whose separation and relative height are
+        fixed by the line energies and the emission probabilities, on a flat
+        background of events which lost part of their charge to a neighboring
+        pixel or to the surface.
+        The only free parameters are the gain, the width of the lines and the
+        size of that background.
+        The fit is an unbinned maximum likelihood, so there is no bin width to
+        choose, which matters because a single image yields only a few tens of
+        events per tap.
+
+        Parameters
+        ----------
+        threshold
+            Passed to :meth:`hits`.
+        gain_min
+            The smallest gain to consider.
+            This and `gain_max` bracket where the K-:math:`\alpha` peak can
+            lie, which is what lets the peak be found without a starting
+            guess.
+        gain_max
+            The largest gain to consider.
+        fe55
+            The properties of the :math:`^{55}\text{Fe}` source.
+            If :obj:`None`, :class:`msfc_ccd.Fe55` is used.
+
+        Returns
+        -------
+        A copy of these images where the outputs are the gain of each tap,
+        or :obj:`numpy.nan` for a tap with too few events to fit.
+
+        Examples
+        --------
+        Measure the gain of the ESIS channel 3 camera.
+
+        .. jupyter-execute::
+
+            import msfc_ccd
+
+            image = msfc_ccd.fits.open(msfc_ccd.samples.path_fe55_esis3)
+
+            image.taps.gain().outputs.ndarray
+        """
+        if fe55 is None:
+            fe55 = Fe55()
+
+        hits = self.hits(threshold)
+
+        unit = u.electron / u.DN
+        gain_min = gain_min.to_value(unit)
+        gain_max = gain_max.to_value(unit)
+
+        charge = hits.outputs
+        axes = tuple(charge.shape)
+        axes_tap = tuple(a for a in (self.axis_tap_y, self.axis_tap_x) if a in axes)
+        axes_pooled = tuple(a for a in axes if a not in axes_tap)
+
+        shape_tap = tuple(charge.shape[a] for a in axes_tap)
+        ndarray = charge.ndarray_aligned(axes_tap + axes_pooled)
+        ndarray = ndarray.to_value(u.DN).reshape(shape_tap + (-1,))
+
+        result = np.empty(shape_tap)
+        for index in np.ndindex(*shape_tap):
+            result[index] = _fit_gain(
+                charge=ndarray[index],
+                gain_min=gain_min,
+                gain_max=gain_max,
+                fe55=fe55,
+            )
+
+        return dataclasses.replace(
+            self,
+            inputs=self.inputs[{a: 0 for a in axes_pooled}],
+            outputs=na.ScalarArray(result * unit, axes=axes_tap),
+        )
+
     def dark_current(
         self,
         axis: str,
@@ -310,7 +542,7 @@ class AbstractTapData(
             images = msfc_ccd.fits.open(path)
 
             # Estimate the dark current rate of each tap
-            images.taps.dark_current("time").outputs.to("DN / s")
+            images.taps.dark_current("time").outputs.to("DN / s").ndarray
 
         Two images give only a rough estimate, since the uncertainty in the
         bias of each image is about a tenth of the signal accumulated between

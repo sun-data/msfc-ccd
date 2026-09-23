@@ -40,6 +40,12 @@ class AbstractTestAbstractTapImage(
         for s in result.ndarray.flat:
             assert isinstance(s, str)
 
+    def test_amplifier(self, a: msfc_ccd.abc.AbstractTapData):
+        result = a.amplifier
+        assert result.shape[a.axis_tap_x] == a.shape[a.axis_tap_x]
+        assert result.shape[a.axis_tap_y] == a.shape[a.axis_tap_y]
+        assert set(result.ndarray.flat) == {"1/E", "2/H", "3/G", "4/F"}
+
     def test_where_blank(self, a: msfc_ccd.abc.AbstractTapData):
         result = a.where_blank()
         assert result.sum() == a.camera.sensor.num_blank
@@ -88,6 +94,79 @@ class AbstractTestAbstractTapImage(
         assert a.axis_y not in result.outputs.shape
         assert np.all(np.abs(result.outputs - sigma) < 0.05 * sigma)
 
+    def test_hits(self, a: msfc_ccd.abc.AbstractTapData):
+        sensor = a.camera.sensor
+        num_blank = sensor.num_blank
+        charge = 600 * u.DN
+
+        outputs = a.outputs.copy()
+
+        # Isolated events, spaced far enough apart to stay isolated
+        index = [
+            {a.axis_x: num_blank + 10 + 71 * k, a.axis_y: 10 + 53 * k} for k in range(8)
+        ]
+        for i in index:
+            outputs[i] = outputs[i] + charge
+
+        # Two adjacent hot pixels, which are not an isolated event
+        index_pair = {a.axis_x: num_blank + 800, a.axis_y: 400}
+        index_next = {a.axis_x: num_blank + 801, a.axis_y: 400}
+        outputs[index_pair] = outputs[index_pair] + charge
+        outputs[index_next] = outputs[index_next] + charge
+
+        result = a.replace(outputs=outputs).hits()
+
+        assert isinstance(result, msfc_ccd.TapData)
+        assert result.shape[a.axis_x] == a.active.shape[a.axis_x]
+        assert result.shape[a.axis_y] == a.shape[a.axis_y]
+
+        # Every isolated event is found, with its charge
+        for i in index:
+            i = {a.axis_x: i[a.axis_x] - num_blank, a.axis_y: i[a.axis_y]}
+            assert np.all(np.isfinite(result.outputs[i]))
+            assert np.all(np.abs(result.outputs[i] - charge) < 0.1 * charge)
+
+        # The adjacent pair is not
+        i = {a.axis_x: index_pair[a.axis_x] - num_blank, a.axis_y: index_pair[a.axis_y]}
+        assert not np.any(np.isfinite(result.outputs[i]))
+
+    def test_gain(self, a: msfc_ccd.abc.AbstractTapData):
+        gain = 2.5 * u.electron / u.DN
+        fe55 = msfc_ccd.Fe55()
+        rng = np.random.default_rng(seed=42)
+
+        num_blank = a.camera.sensor.num_blank
+        num_x, num_y, step = 30, 15, 33
+
+        # Fe 55 events on a grid, spaced far enough apart to stay isolated
+        probability_beta = fe55.probability_k_beta / (
+            fe55.probability_k_alpha + fe55.probability_k_beta
+        )
+        where_beta = rng.random(size=(num_x, num_y)) < probability_beta
+        charge = np.where(where_beta, fe55.charge_k_beta, fe55.charge_k_alpha)
+        charge = charge / gain + rng.normal(scale=14, size=charge.shape) * u.DN
+        charge = na.ScalarArray(charge, axes=(a.axis_x, a.axis_y))
+
+        index = {
+            a.axis_x: slice(num_blank + 8, num_blank + 8 + num_x * step, step),
+            a.axis_y: slice(8, 8 + num_y * step, step),
+        }
+        outputs = a.outputs.copy()
+        outputs[index] = outputs[index] + charge
+
+        result = a.replace(outputs=outputs).gain()
+
+        assert isinstance(result, msfc_ccd.TapData)
+        assert a.axis_x not in result.outputs.shape
+        assert a.axis_y not in result.outputs.shape
+        assert na.unit(result.outputs).is_equivalent(u.electron / u.DN)
+        assert np.all(np.abs(result.outputs - gain) < 0.02 * gain)
+
+    def test_gain_without_events(self, a: msfc_ccd.abc.AbstractTapData):
+        """A tap with too few events has no gain to report."""
+        result = a.gain()
+        assert np.all(np.isnan(result.outputs))
+
     @classmethod
     def _darks(
         cls,
@@ -108,8 +187,9 @@ class AbstractTestAbstractTapImage(
 
         # Cosmic rays, which arrive in proportion to the exposure time and so
         # would otherwise be counted as dark current.
-        # They land only in the active pixels, since a cosmic ray in the blank
-        # columns would corrupt the bias instead.
+        # They land only in the active pixels. The blank columns are extra
+        # clock cycles of an empty serial register rather than real pixels,
+        # so nothing can accumulate there.
         rng = np.random.default_rng(seed=42)
         shape = outputs.shape
         num_blank = a.camera.sensor.num_blank
