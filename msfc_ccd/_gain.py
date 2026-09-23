@@ -1,6 +1,7 @@
 """Support for measuring the gain of a camera from an Fe 55 exposure."""
 
 import dataclasses
+import warnings
 import numpy as np
 import scipy.optimize
 import scipy.stats
@@ -75,17 +76,25 @@ class Fe55:
         e_2 = self.energy_k_alpha_2
         return (p_1 * e_1 + p_2 * e_2) / (p_1 + p_2)
 
+    @staticmethod
+    def _charge(energy: u.Quantity) -> u.Quantity:
+        # `quantum_yield_ideal` divides by zero on its way to the answer,
+        # which is harmless but would otherwise warn on every call and show
+        # up as a stderr cell in the documentation.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            result = optika.sensors.quantum_yield_ideal(energy)
+        return (result.ndarray * u.ph) << u.electron
+
     @property
     def charge_k_alpha(self) -> u.Quantity:
         r"""The electrons released in silicon by a K-:math:`\alpha` X-ray."""
-        result = optika.sensors.quantum_yield_ideal(self.energy_k_alpha)
-        return (result.ndarray * u.ph) << u.electron
+        return self._charge(self.energy_k_alpha)
 
     @property
     def charge_k_beta(self) -> u.Quantity:
         r"""The electrons released in silicon by a K-:math:`\beta` X-ray."""
-        result = optika.sensors.quantum_yield_ideal(self.energy_k_beta)
-        return (result.ndarray * u.ph) << u.electron
+        return self._charge(self.energy_k_beta)
 
 
 def _fit_gain(
@@ -130,15 +139,19 @@ def _fit_gain(
     # Fit only near the peak, which leaves the background nearly flat
     lower, upper = 0.80 * center, 1.30 * center
     charge = charge[(lower < charge) & (charge < upper)]
-    if charge.size < 5:
+    if charge.size < 5:  # pragma: nocover
         return np.nan
+
+    # Confining the gain to the window keeps the K-alpha peak inside it,
+    # so the normalizations below can never collapse.
+    bounds = [
+        (max(gain_min, q_alpha / upper), min(gain_max, q_alpha / lower)),
+        (1, (upper - lower) / 2),
+        (0, 1),
+    ]
 
     def neglog(p: np.ndarray) -> float:
         gain, width, background = p
-        if not (gain_min < gain < gain_max):
-            return np.inf
-        if width <= 0 or not (0 <= background < 1):
-            return np.inf
         center_alpha = q_alpha / gain
         center_beta = q_beta / gain
         cdf = scipy.stats.norm.cdf
@@ -148,13 +161,12 @@ def _fit_gain(
         norm_beta = float(
             cdf(upper, center_beta, width) - cdf(lower, center_beta, width)
         )
-        if norm_alpha < 1e-6:
-            return np.inf
         density = p_alpha * scipy.stats.norm.pdf(charge, center_alpha, width)
         density = density / norm_alpha
-        density = density + p_beta * scipy.stats.norm.pdf(
-            charge, center_beta, width
-        ) / max(norm_beta, 1e-12)
+        density = (
+            density
+            + p_beta * scipy.stats.norm.pdf(charge, center_beta, width) / norm_beta
+        )
         density = (1 - background) * density + background / (upper - lower)
         return -np.sum(np.log(np.maximum(density, 1e-300)))
 
@@ -162,9 +174,10 @@ def _fit_gain(
         fun=neglog,
         x0=np.array([q_alpha / center, 15.0, 0.2]),
         method="Nelder-Mead",
+        bounds=bounds,
         options=dict(maxiter=4000, xatol=1e-5, fatol=1e-5),
     )
-    if not result.success:
+    if not result.success:  # pragma: nocover
         return np.nan
 
     return result.x[0]

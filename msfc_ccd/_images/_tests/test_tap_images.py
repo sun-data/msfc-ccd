@@ -156,6 +156,11 @@ class AbstractTestAbstractTapImage(
         assert na.unit(result.outputs).is_equivalent(u.electron / u.DN)
         assert np.all(np.abs(result.outputs - gain) < 0.02 * gain)
 
+    def test_gain_without_events(self, a: msfc_ccd.abc.AbstractTapData):
+        """A tap with too few events has no gain to report."""
+        result = a.gain()
+        assert np.all(np.isnan(result.outputs))
+
     @classmethod
     def _darks(
         cls,
@@ -176,8 +181,9 @@ class AbstractTestAbstractTapImage(
 
         # Cosmic rays, which arrive in proportion to the exposure time and so
         # would otherwise be counted as dark current.
-        # They land only in the active pixels, since a cosmic ray in the blank
-        # columns would corrupt the bias instead.
+        # They land only in the active pixels. The blank columns are extra
+        # clock cycles of an empty serial register rather than real pixels,
+        # so nothing can accumulate there.
         rng = np.random.default_rng(seed=42)
         shape = outputs.shape
         num_blank = a.camera.sensor.num_blank
