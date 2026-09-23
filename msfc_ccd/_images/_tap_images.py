@@ -283,6 +283,204 @@ class AbstractTapData(
             outputs=std / np.sqrt(2),
         )
 
+    def photon_transfer(
+        self,
+        axis: str,
+        threshold: float = 5,
+    ) -> na.FunctionArray[na.ScalarArray, na.ScalarArray]:
+        r"""
+        Compute the photon transfer curve of each tap from a sequence of flats.
+
+        The images must be a sequence of uniformly illuminated images, or
+        flats, gathered using the same illumination and exposure length.
+        For each pair of adjacent images along `axis`,
+        the signal is the mean of the two images and the variance is half the
+        variance of their difference,
+        computed over the active pixels outside the masked rows,
+        :meth:`where_masked`.
+
+        Differencing the two images removes everything the two images have in
+        common, including the pattern of the illumination and the variation in
+        response from pixel to pixel,
+        and leaves only the shot noise and the readout noise.
+        The shot noise has a variance, in electrons, equal to the signal,
+        so the variance in data numbers is
+
+        .. math::
+
+            \sigma^2 = \frac{S}{g} + \sigma_r^2,
+
+        where :math:`S` is the signal, :math:`g` is the gain,
+        and :math:`\sigma_r` is the readout noise.
+        Gathering pairs at several levels of illumination traces out the
+        photon transfer curve, and :meth:`gain_photon_transfer` uses it to
+        measure the gain.
+
+        The result has one fewer element along `axis` than the input,
+        since it is defined for each pair of adjacent images.
+
+        Parameters
+        ----------
+        axis
+            The logical axis along which the images are a sequence of flats.
+        threshold
+            Pixels in the difference image further than this many standard
+            deviations from the median are rejected, as in
+            :meth:`readout_noise`, to remove cosmic rays.
+
+        Examples
+        --------
+        Compute the signal and the variance of a pair of images of a diffuse
+        LED source.
+
+        .. jupyter-execute::
+
+            import numpy as np
+            import named_arrays as na
+            import msfc_ccd
+
+            # Load two consecutive images with the same illumination
+            path = na.ScalarArray(
+                ndarray=np.array([
+                    msfc_ccd.samples.path_led_esis1,
+                    msfc_ccd.samples.path_led_esis1_next,
+                ]),
+                axes="time",
+            )
+            images = msfc_ccd.fits.open(path)
+
+            # Compute the signal and the variance of each tap
+            ptc = images.taps.photon_transfer("time")
+
+            ptc.inputs.ndarray
+
+        .. jupyter-execute::
+
+            ptc.outputs.ndarray
+        """
+        num_masked = self.camera.sensor.num_masked
+        outputs = self.unbiased.active.outputs
+        outputs = outputs[{self.axis_y: slice(num_masked, None)}]
+        outputs_1 = outputs[{axis: slice(1, None)}]
+        outputs_0 = outputs[{axis: slice(None, -1)}]
+
+        signal = ((outputs_1 + outputs_0) / 2).mean(self.axis_xy)
+
+        variance = self._variance_difference(
+            difference=outputs_1 - outputs_0,
+            threshold=threshold,
+        )
+
+        return na.FunctionArray(
+            inputs=signal,
+            outputs=variance,
+        )
+
+    def gain_photon_transfer(
+        self,
+        axis: str,
+        threshold: float = 5,
+    ) -> Self:
+        r"""
+        Measure the gain of each tap from a sequence of flat images.
+
+        The gain is the ratio of the signal to the shot noise variance
+        computed by :meth:`photon_transfer`,
+
+        .. math::
+
+            g = \frac{S}{\sigma^2 - \sigma_r^2},
+
+        pooled over every axis except the two tap axes,
+        so pairs of flats at several levels of illumination can be combined.
+        The readout noise, :math:`\sigma_r`, is measured from the blank columns
+        of the same pairs of images, where there is no shot noise,
+        so it follows any change in the noise of the camera during the test.
+
+        This method is independent of :meth:`gain`, which measures the gain
+        from the charge released by :math:`^{55}\text{Fe}` X-rays.
+        On the tests of 2017-07-12 the two agree to within 3 percent,
+        with the flats giving the lower gain on every tap.
+
+        The flats should be well below full well.
+        Above about 5,000 DN, the variance of the ESIS cameras grows more
+        slowly than the signal, so the apparent gain rises,
+        by 1 to 2 percent at 15,000 DN and about 5 percent at 30,000 DN.
+        The sample images in the example below are near 15,000 DN.
+
+        Parameters
+        ----------
+        axis
+            The logical axis along which the images are a sequence of flats.
+        threshold
+            Pixels in the difference images further than this many standard
+            deviations from the median are rejected, to remove cosmic rays.
+
+        Examples
+        --------
+        Measure the gain of the ESIS channel 1 camera from a pair of images of
+        a diffuse LED source.
+
+        .. jupyter-execute::
+
+            import numpy as np
+            import named_arrays as na
+            import msfc_ccd
+
+            # Load two consecutive images with the same illumination
+            path = na.ScalarArray(
+                ndarray=np.array([
+                    msfc_ccd.samples.path_led_esis1,
+                    msfc_ccd.samples.path_led_esis1_next,
+                ]),
+                axes="time",
+            )
+            images = msfc_ccd.fits.open(path)
+
+            # Measure the gain of each tap
+            images.taps.gain_photon_transfer("time").outputs.ndarray
+        """
+        ptc = self.photon_transfer(axis, threshold)
+
+        outputs = self.outputs
+        outputs = outputs[{self.axis_x: self.where_blank(num=25)}]
+        outputs_1 = outputs[{axis: slice(1, None)}]
+        outputs_0 = outputs[{axis: slice(None, -1)}]
+        variance_readout = self._variance_difference(
+            difference=outputs_1 - outputs_0,
+            threshold=threshold,
+        )
+
+        axes_tap = (self.axis_tap_x, self.axis_tap_y)
+        axes_pooled = tuple(a for a in ptc.outputs.shape if a not in axes_tap)
+
+        signal = ptc.inputs.sum(axes_pooled)
+        variance = (ptc.outputs - variance_readout).sum(axes_pooled)
+
+        return dataclasses.replace(
+            self,
+            inputs=self.inputs[{a: 0 for a in axes_pooled}],
+            outputs=(u.electron * signal / variance).to(u.electron / u.DN),
+        )
+
+    def _variance_difference(
+        self,
+        difference: na.AbstractScalarArray,
+        threshold: float,
+    ) -> na.AbstractScalarArray:
+        """Half the variance of a difference image, rejecting spikes."""
+        axis_xy = (self.axis_x, self.axis_y)
+        median = np.median(difference, axis=axis_xy)
+        deviation = np.abs(difference - median)
+        mad = np.median(deviation, axis=axis_xy)
+
+        # The ratio of the standard deviation to the median absolute deviation
+        # for a normal distribution
+        factor = 1.482602218505602
+        where = deviation < threshold * factor * mad
+
+        return np.square(difference.std(axis=axis_xy, where=where)) / 2
+
     def hits(
         self,
         threshold: float = 5,

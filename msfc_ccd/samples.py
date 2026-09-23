@@ -9,6 +9,7 @@ __all__ = [
     "path_dark_esis1",
     "path_dark_esis3",
     "path_led_esis1",
+    "path_led_esis1_next",
     "path_led_dark_esis1",
     "path_led_dark_esis1_next",
     "path_dark_2s_esis1",
@@ -64,6 +65,14 @@ A sample image of a diffuse LED source from the ESIS channel 1 camera.
 
 Gathered by the MSFC sounding rocket team during the linearity test
 on 2017-07-12.
+"""
+
+path_led_esis1_next = pathlib.Path(__file__).parent / "_data/led/ESIS1_04804.fit.gz"
+"""
+The next image in the sequence after :obj:`path_led_esis1`.
+
+Captured two seconds later with the same illumination, so the pair can be
+used to measure the shot noise and the gain of the camera.
 """
 
 path_led_dark_esis1 = pathlib.Path(__file__).parent / "_data/led/ESIS1_04860.fit.gz"

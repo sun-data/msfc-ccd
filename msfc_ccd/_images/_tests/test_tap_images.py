@@ -173,6 +173,75 @@ class AbstractTestAbstractTapImage(
         assert np.all(np.isnan(result.outputs))
 
     @classmethod
+    def _flats(
+        cls,
+        a: msfc_ccd.abc.AbstractTapData,
+        axis: str,
+        signal: na.AbstractScalar,
+        gain: u.Quantity,
+        readout_noise: u.Quantity,
+        num: int = 4,
+    ) -> msfc_ccd.abc.AbstractTapData:
+        """Build a sequence of flats with a known gain."""
+        rng = np.random.default_rng(seed=42)
+
+        # A pattern of illumination which varies across each tap, which the
+        # difference of two flats must cancel.
+        i = a.outputs.indices[a.axis_x]
+        pattern = 0.5 + i / a.shape[a.axis_x]
+
+        # The light reaches only the light-sensitive pixels
+        where_active = ~(a.where_blank() | a.where_overscan())
+        mean = signal * pattern * where_active
+        mean = na.broadcast_to(mean, mean.shape | a.outputs.shape)
+
+        shape = {axis: num} | mean.shape
+        electrons = rng.poisson(
+            lam=(gain * mean).to(u.electron).ndarray_aligned(mean.shape).value,
+            size=tuple(shape.values()),
+        )
+        electrons = na.ScalarArray(electrons * u.electron, axes=tuple(shape))
+        readout = na.ScalarArray(
+            ndarray=rng.normal(size=tuple(shape.values())) * readout_noise,
+            axes=tuple(shape),
+        )
+
+        return a.replace(outputs=a.outputs + electrons / gain + readout)
+
+    def test_photon_transfer(self, a: msfc_ccd.abc.AbstractTapData):
+        axis = "_test_photon_transfer"
+        num = 4
+        signal = 4000 * u.DN
+        gain = 2.5 * u.electron / u.DN
+        readout_noise = 4 * u.DN
+        b = self._flats(a, axis, signal, gain, readout_noise, num=num)
+
+        result = b.photon_transfer(axis)
+
+        assert isinstance(result, na.FunctionArray)
+        assert result.outputs.shape[axis] == num - 1
+        assert a.axis_x not in result.outputs.shape
+        assert a.axis_y not in result.outputs.shape
+        assert na.unit(result.inputs).is_equivalent(u.DN)
+        assert na.unit(result.outputs).is_equivalent(u.DN**2)
+
+        expected = result.inputs * u.electron / gain + np.square(readout_noise)
+        assert np.all(np.abs(result.outputs / expected - 1) < 0.01)
+
+    def test_gain_photon_transfer(self, a: msfc_ccd.abc.AbstractTapData):
+        axis = "_test_gain_photon_transfer"
+        signal = na.ScalarArray([2000, 6000] * u.DN, axes="_test_level")
+        gain = 2.5 * u.electron / u.DN
+        b = self._flats(a, axis, signal, gain, readout_noise=4 * u.DN)
+
+        result = b.gain_photon_transfer(axis)
+
+        assert isinstance(result, msfc_ccd.TapData)
+        assert set(result.outputs.shape) == {a.axis_tap_x, a.axis_tap_y}
+        assert na.unit(result.outputs).is_equivalent(u.electron / u.DN)
+        assert np.all(np.abs(result.outputs - gain) < 0.01 * gain)
+
+    @classmethod
     def _darks(
         cls,
         a: msfc_ccd.abc.AbstractTapData,
