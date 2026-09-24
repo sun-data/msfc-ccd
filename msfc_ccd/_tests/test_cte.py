@@ -3,18 +3,10 @@ import numpy as np
 import astropy.units as u
 import named_arrays as na
 import msfc_ccd
-
-_camera = msfc_ccd.Camera(
-    gain=na.ScalarArray(
-        ndarray=[[2.5, 2.6], [2.7, 2.8]] * u.electron / u.DN,
-        axes=("tx", "ty"),
-    ),
-    axis_tap_x="tx",
-    axis_tap_y="ty",
-)
+from . import _shared
 
 _taps = [
-    msfc_ccd.fits.open(msfc_ccd.samples.path_dark_esis1, _camera).taps,
+    _shared.dark.taps,
 ]
 
 

@@ -10,6 +10,7 @@ import dataclasses
 import numpy as np
 import named_arrays as na
 from ._images.abc import AbstractTapData
+from ._measurements import TapDataT, _message_taps, _variance_difference
 
 __all__ = [
     "readout",
@@ -18,10 +19,10 @@ __all__ = [
 
 
 def readout(
-    images: AbstractTapData,
+    images: TapDataT,
     axis: str,
     threshold: float = 5,
-) -> AbstractTapData:
+) -> TapDataT:
     r"""
     Estimate the readout noise of each tap from a sequence of dark images.
 
@@ -39,7 +40,8 @@ def readout(
     Parameters
     ----------
     images
-        A sequence of dark images.
+        A sequence of dark images from each tap, such as the
+        :attr:`~msfc_ccd.abc.AbstractSensorData.taps` of a sequence of images.
     axis
         The logical axis along which the images are a sequence of darks.
     threshold
@@ -47,7 +49,20 @@ def readout(
         deviations from the median are rejected.
         The standard deviation used for the rejection is estimated from the
         median absolute deviation, which is not affected by the spikes.
+
+    Returns
+    -------
+    A copy of `images`, of the same type, whose outputs are the readout
+    noise of each tap for each pair of adjacent images.
+
+    Raises
+    ------
+    TypeError
+        If `images` is not the images from each tap.
     """
+    if not isinstance(images, AbstractTapData):
+        raise TypeError(_message_taps(images))
+
     outputs = images.active.outputs
     outputs_1 = outputs[{axis: slice(1, None)}]
     outputs_0 = outputs[{axis: slice(None, -1)}]
@@ -104,13 +119,19 @@ def photon_transfer(
     Parameters
     ----------
     images
-        A sequence of flats.
+        A sequence of flats from each tap, such as the
+        :attr:`~msfc_ccd.abc.AbstractSensorData.taps` of a sequence of images.
     axis
         The logical axis along which the images are a sequence of flats.
     threshold
         Pixels in the difference image further than this many standard
         deviations from the median are rejected, as in :func:`readout`,
         to remove cosmic rays.
+
+    Raises
+    ------
+    TypeError
+        If `images` is not the images from each tap.
 
     Examples
     --------
@@ -142,6 +163,9 @@ def photon_transfer(
 
         ptc.outputs.ndarray
     """
+    if not isinstance(images, AbstractTapData):
+        raise TypeError(_message_taps(images))
+
     num_masked = images.camera.sensor.num_masked
     outputs = images.unbiased.active.outputs
     outputs = outputs[{images.axis_y: slice(num_masked, None)}]
@@ -160,21 +184,3 @@ def photon_transfer(
         inputs=signal,
         outputs=variance,
     )
-
-
-def _variance_difference(
-    difference: na.AbstractScalarArray,
-    axis: tuple[str, str],
-    threshold: float,
-) -> na.AbstractScalarArray:
-    """Half the variance of a difference image, rejecting spikes."""
-    median = np.median(difference, axis=axis)
-    deviation = np.abs(difference - median)
-    mad = np.median(deviation, axis=axis)
-
-    # The ratio of the standard deviation to the median absolute deviation
-    # for a normal distribution
-    factor = 1.482602218505602
-    where = deviation < threshold * factor * mad
-
-    return np.square(difference.std(axis=axis, where=where)) / 2

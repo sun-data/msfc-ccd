@@ -30,6 +30,7 @@ pip install msfc-ccd
 - [`TapData`](https://msfc-ccd.readthedocs.io/en/latest/_autosummary/msfc_ccd.TapData.html), the same image split into the four quadrants read out by the four taps of the sensor.
 - [`ImageHeader`](https://msfc-ccd.readthedocs.io/en/latest/_autosummary/msfc_ccd.ImageHeader.html), the FITS metadata for each image, including the exposure time, the sensor and FPGA temperatures, and the timestamps.
 - [`Camera`](https://msfc-ccd.readthedocs.io/en/latest/_autosummary/msfc_ccd.Camera.html) and [`TeledyneCCD230`](https://msfc-ccd.readthedocs.io/en/latest/_autosummary/msfc_ccd.TeledyneCCD230.html), models of the camera and its sensor, carrying the parameters needed to calibrate an image: gain, dark current, readout noise, charge transfer efficiency, and the exposure timing.
+- [`noise`](https://msfc-ccd.readthedocs.io/en/latest/_autosummary/msfc_ccd.noise.html), [`dark`](https://msfc-ccd.readthedocs.io/en/latest/_autosummary/msfc_ccd.dark.html), [`gain`](https://msfc-ccd.readthedocs.io/en/latest/_autosummary/msfc_ccd.gain.html) and [`cte`](https://msfc-ccd.readthedocs.io/en/latest/_autosummary/msfc_ccd.cte.html), which measure the readout noise, dark current, gain and charge transfer efficiency of each tap from darks, flats and Fe 55 exposures.
 - [`samples`](https://msfc-ccd.readthedocs.io/en/latest/_autosummary/msfc_ccd.samples.html), a handful of real FITS files gathered from the cameras, used by the examples below.
 
 ## Key concepts
@@ -50,7 +51,7 @@ Those columns see no light, so their mean is an estimate of the bias for that ta
 **Converting to electrons needs a gain.**
 `.electrons` multiplies by `Camera.gain`, which is usually different for each tap and has to be measured.
 A `Camera` constructed without one, which is what `fits.open()` uses by default, has no gain to apply, and raises a `ValueError` naming the missing parameter rather than guessing.
-Supply your measured value with `msfc_ccd.Camera(gain=...)` before converting, remembering that the gain differs from tap to tap.
+Measure it with `msfc_ccd.gain.fe55()` or `msfc_ccd.gain.photon_transfer()`, and supply the result with `msfc_ccd.Camera(gain=...)` before converting.
 
 ## Examples
 

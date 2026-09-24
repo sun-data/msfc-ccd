@@ -11,6 +11,7 @@ import astropy.units as u
 import named_arrays as na
 from ._fe55 import Fe55, _fit_gain
 from ._images.abc import AbstractTapData
+from ._measurements import TapDataT, _message_taps, _variance_difference
 from . import noise
 
 __all__ = [
@@ -20,12 +21,12 @@ __all__ = [
 
 
 def fe55(
-    images: AbstractTapData,
+    images: TapDataT,
     threshold: float = 5,
     gain_min: u.Quantity = 2 * u.electron / u.DN,
     gain_max: u.Quantity = 5 * u.electron / u.DN,
     source: None | Fe55 = None,
-) -> AbstractTapData:
+) -> TapDataT:
     r"""
     Measure the gain of each tap from one or more Fe 55 exposures.
 
@@ -47,7 +48,8 @@ def fe55(
     Parameters
     ----------
     images
-        One or more Fe 55 exposures.
+        One or more Fe 55 exposures from each tap, such as the
+        :attr:`~msfc_ccd.abc.AbstractSensorData.taps` of an image.
     threshold
         Passed to :meth:`~msfc_ccd.abc.AbstractTapData.hits`.
     gain_min
@@ -63,8 +65,13 @@ def fe55(
 
     Returns
     -------
-    A copy of `images` where the outputs are the gain of each tap,
-    or :obj:`numpy.nan` for a tap with too few events to fit.
+    A copy of `images`, of the same type, whose outputs are the gain of each
+    tap, or :obj:`numpy.nan` for a tap with too few events to fit.
+
+    Raises
+    ------
+    TypeError
+        If `images` is not the images from each tap.
 
     Examples
     --------
@@ -78,6 +85,9 @@ def fe55(
 
         msfc_ccd.gain.fe55(image.taps).outputs.ndarray
     """
+    if not isinstance(images, AbstractTapData):
+        raise TypeError(_message_taps(images))
+
     if source is None:
         source = Fe55()
 
@@ -114,10 +124,10 @@ def fe55(
 
 
 def photon_transfer(
-    images: AbstractTapData,
+    images: TapDataT,
     axis: str,
     threshold: float = 5,
-) -> AbstractTapData:
+) -> TapDataT:
     r"""
     Measure the gain of each tap from a sequence of flat images.
 
@@ -148,12 +158,23 @@ def photon_transfer(
     Parameters
     ----------
     images
-        A sequence of flats.
+        A sequence of flats from each tap, such as the
+        :attr:`~msfc_ccd.abc.AbstractSensorData.taps` of a sequence of images.
     axis
         The logical axis along which the images are a sequence of flats.
     threshold
         Pixels in the difference images further than this many standard
         deviations from the median are rejected, to remove cosmic rays.
+
+    Returns
+    -------
+    A copy of `images`, of the same type, whose outputs are the gain of each
+    tap.
+
+    Raises
+    ------
+    TypeError
+        If `images` is not the images from each tap.
 
     Examples
     --------
@@ -179,13 +200,16 @@ def photon_transfer(
         # Measure the gain of each tap
         msfc_ccd.gain.photon_transfer(images.taps, "time").outputs.ndarray
     """
+    if not isinstance(images, AbstractTapData):
+        raise TypeError(_message_taps(images))
+
     ptc = noise.photon_transfer(images, axis, threshold)
 
     outputs = images.outputs
     outputs = outputs[{images.axis_x: images.where_blank(num=25)}]
     outputs_1 = outputs[{axis: slice(1, None)}]
     outputs_0 = outputs[{axis: slice(None, -1)}]
-    variance_readout = noise._variance_difference(
+    variance_readout = _variance_difference(
         difference=outputs_1 - outputs_0,
         axis=images.axis_xy,
         threshold=threshold,

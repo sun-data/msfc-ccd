@@ -11,6 +11,7 @@ import astropy.units as u
 import named_arrays as na
 from ._fe55 import Fe55, _fit_cte
 from ._images.abc import AbstractTapData
+from ._measurements import TapDataT, _message_taps
 
 __all__ = [
     "fe55",
@@ -19,13 +20,13 @@ __all__ = [
 
 
 def fe55(
-    images: AbstractTapData,
+    images: TapDataT,
     threshold: float = 5,
     threshold_split: float = 3,
     gain_min: u.Quantity = 2 * u.electron / u.DN,
     gain_max: u.Quantity = 5 * u.electron / u.DN,
     source: None | Fe55 = None,
-) -> AbstractTapData:
+) -> TapDataT:
     r"""
     Estimate the charge transfer efficiency of each tap from Fe 55 images.
 
@@ -76,7 +77,8 @@ def fe55(
     Parameters
     ----------
     images
-        Several hundred Fe 55 exposures.
+        Several hundred Fe 55 exposures from each tap, such as the
+        :attr:`~msfc_ccd.abc.AbstractSensorData.taps` of a sequence of images.
     threshold
         How many readout noises above the dark level a pixel must be to
         start an event.
@@ -92,6 +94,19 @@ def fe55(
     source
         The properties of the :math:`^{55}\text{Fe}` source.
         If :obj:`None`, the default :class:`msfc_ccd.Fe55` is used.
+
+    Returns
+    -------
+    A copy of `images`, of the same type, whose outputs are the serial and
+    parallel charge transfer efficiency of each tap,
+    as the :math:`x` and :math:`y` components of a
+    :class:`named_arrays.Cartesian2dVectorArray`,
+    or :obj:`numpy.nan` for a tap with too few events to fit.
+
+    Raises
+    ------
+    TypeError
+        If `images` is not the images from each tap.
 
     Examples
     --------
@@ -122,6 +137,9 @@ def fe55(
         # The parallel charge transfer efficiency
         cte.y.ndarray
     """
+    if not isinstance(images, AbstractTapData):
+        raise TypeError(_message_taps(images))
+
     if source is None:
         source = Fe55()
 
@@ -180,9 +198,9 @@ def fe55(
 
 
 def eper(
-    images: AbstractTapData,
+    images: TapDataT,
     num_active: int = 10,
-) -> AbstractTapData:
+) -> TapDataT:
     r"""
     Estimate the serial charge transfer efficiency of each tap from a flat.
 
@@ -227,10 +245,21 @@ def eper(
     Parameters
     ----------
     images
-        One or more flats.
+        One or more flats from each tap, such as the
+        :attr:`~msfc_ccd.abc.AbstractSensorData.taps` of an image.
     num_active
         The number of active columns at the end of each row used to
         measure the signal.
+
+    Returns
+    -------
+    A copy of `images`, of the same type, whose outputs are the serial
+    charge transfer efficiency of each tap for each image.
+
+    Raises
+    ------
+    TypeError
+        If `images` is not the images from each tap.
 
     Examples
     --------
@@ -245,6 +274,9 @@ def eper(
 
         msfc_ccd.cte.eper(image.taps).outputs.ndarray
     """
+    if not isinstance(images, AbstractTapData):
+        raise TypeError(_message_taps(images))
+
     sensor = images.camera.sensor
 
     outputs = images.unbiased.outputs

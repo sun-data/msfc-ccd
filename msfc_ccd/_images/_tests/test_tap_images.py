@@ -4,15 +4,9 @@ import astropy.units as u
 import named_arrays as na
 import msfc_ccd
 from . import test_images
+from ..._tests import _shared
 
-_camera = msfc_ccd.Camera(
-    gain=na.ScalarArray(
-        ndarray=[[2.5, 2.6], [2.7, 2.8]] * u.electron / u.DN,
-        axes=("tx", "ty"),
-    ),
-    axis_tap_x="tx",
-    axis_tap_y="ty",
-)
+_camera = _shared.camera
 
 
 class AbstractTestAbstractTapImage(

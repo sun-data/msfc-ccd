@@ -8,7 +8,8 @@ and :func:`current` needs them at a range of exposure lengths.
 import dataclasses
 import numpy as np
 import named_arrays as na
-from ._images.abc import AbstractCameraData, AbstractTapData
+from ._images.abc import AbstractTapData
+from ._measurements import CameraDataT, TapDataT, _message_taps
 
 __all__ = [
     "master",
@@ -17,10 +18,10 @@ __all__ = [
 
 
 def master(
-    images: AbstractCameraData,
+    images: CameraDataT,
     axis: str,
     proportion: float = 0.25,
-) -> AbstractCameraData:
+) -> CameraDataT:
     """
     Estimate the master dark image of each tap from a sequence of dark images.
 
@@ -48,6 +49,11 @@ def master(
         The number of images removed is rounded down,
         so with fewer than ``1 / proportion`` images
         nothing is removed.
+
+    Returns
+    -------
+    A copy of `images`, of the same type, whose outputs are the master dark,
+    without `axis`.
     """
     outputs = na.mean_trimmed(
         a=images.outputs,
@@ -62,10 +68,10 @@ def master(
 
 
 def current(
-    images: AbstractTapData,
+    images: TapDataT,
     axis: str,
     proportion: float = 0.01,
-) -> AbstractTapData:
+) -> TapDataT:
     """
     Estimate the dark current rate of each tap.
 
@@ -99,7 +105,9 @@ def current(
     Parameters
     ----------
     images
-        A sequence of dark images gathered using a range of exposure lengths.
+        A sequence of dark images from each tap, gathered using a range of
+        exposure lengths, such as the
+        :attr:`~msfc_ccd.abc.AbstractSensorData.taps` of a sequence of images.
     axis
         The logical axis along which the images are a sequence of darks.
     proportion
@@ -112,6 +120,16 @@ def current(
         proportion from 0 to 0.05.
         Trimming much harder removes the hot pixels too,
         which are part of the dark current.
+
+    Returns
+    -------
+    A copy of `images`, of the same type, whose outputs are the dark current
+    rate of each tap.
+
+    Raises
+    ------
+    TypeError
+        If `images` is not the images from each tap.
 
     Examples
     --------
@@ -145,6 +163,9 @@ def current(
     within six percent of the independent analysis of the same test by
     MSFC.
     """
+    if not isinstance(images, AbstractTapData):
+        raise TypeError(_message_taps(images))
+
     num_masked = images.camera.sensor.num_masked
     signal = images.unbiased.active.outputs
     signal = signal[{images.axis_y: slice(num_masked, None)}]
