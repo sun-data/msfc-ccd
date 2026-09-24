@@ -1,4 +1,4 @@
-"""Support for measuring the gain of a camera from an Fe 55 exposure."""
+"""The X-rays of an Fe 55 source, and fits to the charge of their events."""
 
 import dataclasses
 import warnings

@@ -37,6 +37,10 @@ Features
     the camera and its sensor, which carry the parameters needed to calibrate
     an image: gain, dark current, readout noise, charge transfer efficiency,
     and the exposure timing.
+*   :mod:`msfc_ccd.noise`, :mod:`msfc_ccd.dark`, :mod:`msfc_ccd.gain` and
+    :mod:`msfc_ccd.cte`, which measure the readout noise, dark current, gain
+    and charge transfer efficiency of each tap from darks, flats and Fe 55
+    exposures.
 *   :mod:`msfc_ccd.samples`, a handful of real FITS files gathered from the
     cameras, used by the examples throughout this documentation.
 
@@ -84,17 +88,28 @@ edge and they accumulate dark current about 80 times faster than the image.
 mask can let real signal reach them, and
 :meth:`~msfc_ccd.abc.AbstractTapData.where_masked` selects them.
 
+**Operations on any image are methods, and measurements are functions.**
+The methods of :class:`msfc_ccd.SensorData` and :class:`msfc_ccd.TapData`,
+such as :attr:`~msfc_ccd.abc.AbstractTapData.unbiased` and
+:meth:`~msfc_ccd.abc.AbstractTapData.hits`, make sense for any image.
+Measuring a property of the camera needs a particular kind of exposure,
+such as a sequence of darks, a pair of flats or an Fe 55 exposure,
+and gives a wrong answer rather than an error on any other kind,
+so those measurements are functions instead,
+grouped by the quantity they measure into :mod:`msfc_ccd.noise`,
+:mod:`msfc_ccd.dark`, :mod:`msfc_ccd.gain` and :mod:`msfc_ccd.cte`.
+
 **Readout noise comes from a sequence of darks.**
 Differencing two adjacent dark images cancels the bias, the dark current and
 the fixed pattern of the sensor, leaving only the readout noise of the two
-frames, so :meth:`~msfc_ccd.abc.AbstractTapData.readout_noise` estimates it
+frames, so :func:`msfc_ccd.noise.readout` estimates it
 from the active pixels of each difference rather than from the columns at the
 edge of a single frame.
 
 **Dark current needs a range of exposure lengths.**
 A two-second dark accumulates less than a tenth of a data number of dark
 current, far below the readout noise, so
-:meth:`~msfc_ccd.abc.AbstractTapData.dark_current` averages over all the
+:func:`msfc_ccd.dark.current` averages over all the
 active pixels of each image outside the masked rows and fits the result
 against the measured exposure time of a set of darks taken at several exposure
 lengths.
@@ -107,9 +122,9 @@ The difference of two flats gathered with the same illumination cancels the
 pattern of the illumination and the response of each pixel, leaving only shot
 noise and readout noise.
 The shot noise variance, in electrons, equals the signal, so
-:meth:`~msfc_ccd.abc.AbstractTapData.photon_transfer` traces out the variance
+:func:`msfc_ccd.noise.photon_transfer` traces out the variance
 against the signal, and
-:meth:`~msfc_ccd.abc.AbstractTapData.gain_photon_transfer` turns it into a
+:func:`msfc_ccd.gain.photon_transfer` turns it into a
 gain, independent of the Fe 55 measurement below.
 
 **Fe 55 events are isolated single-pixel hits.**
@@ -130,17 +145,17 @@ to be measured.
 A :class:`msfc_ccd.Camera` constructed without one, which is what
 :func:`msfc_ccd.fits.open` uses by default, has no gain to apply, and raises a
 :class:`ValueError` naming the missing parameter rather than guessing.
-:meth:`~msfc_ccd.abc.AbstractTapData.gain` measures it from an
+:func:`msfc_ccd.gain.fe55` measures it from an
 :math:`^{55}\text{Fe}` exposure, and the result goes straight into
 ``msfc_ccd.Camera(gain=...)``.
 
 **Charge transfer efficiency comes from two kinds of image.**
 Each transfer on the way to the amplifier leaves a small fraction of the
 charge in a pixel behind.
-:meth:`~msfc_ccd.abc.AbstractTapData.cte_eper` measures the serial efficiency
+:func:`msfc_ccd.cte.eper` measures the serial efficiency
 from a flat, using the charge that trails into the overscan columns after the
 last active pixel of each row.
-:meth:`~msfc_ccd.abc.AbstractTapData.cte_fe55` measures both the serial and the
+:func:`msfc_ccd.cte.fe55` measures both the serial and the
 parallel efficiency from how the charge of Fe 55 events falls with their
 distance from the amplifier, which takes several hundred images.
 
@@ -222,7 +237,7 @@ Measure the readout noise of each tap from a pair of adjacent dark images.
     )
 
     # The difference of adjacent frames leaves only the readout noise
-    darks.taps.readout_noise(axis_time).outputs.ndarray
+    msfc_ccd.noise.readout(darks.taps, axis_time).outputs.ndarray
 
 |
 
@@ -243,7 +258,7 @@ different exposure lengths.
     )
 
     # The slope of the signal against the exposure time is the dark current
-    darks.taps.dark_current(axis_time).outputs.to("DN / s").ndarray
+    msfc_ccd.dark.current(darks.taps, axis_time).outputs.to("DN / s").ndarray
 
 |
 
@@ -264,7 +279,7 @@ with the same illumination.
     )
 
     # The ratio of the signal to the shot noise variance is the gain
-    flats.taps.gain_photon_transfer(axis_time).outputs.ndarray
+    msfc_ccd.gain.photon_transfer(flats.taps, axis_time).outputs.ndarray
 
 |
 
@@ -275,7 +290,7 @@ image into electrons.
 
     # Load an Fe 55 exposure and measure the gain of each tap
     fe55 = msfc_ccd.fits.open(msfc_ccd.samples.path_fe55_esis3)
-    gain = fe55.taps.gain().outputs
+    gain = msfc_ccd.gain.fe55(fe55.taps).outputs
 
     gain.ndarray
 
