@@ -134,6 +134,16 @@ A :class:`msfc_ccd.Camera` constructed without one, which is what
 :math:`^{55}\text{Fe}` exposure, and the result goes straight into
 ``msfc_ccd.Camera(gain=...)``.
 
+**Charge transfer efficiency comes from two kinds of image.**
+Each transfer on the way to the amplifier leaves a small fraction of the
+charge in a pixel behind.
+:meth:`~msfc_ccd.abc.AbstractTapData.cte_eper` measures the serial efficiency
+from a flat, using the charge that trails into the overscan columns after the
+last active pixel of each row.
+:meth:`~msfc_ccd.abc.AbstractTapData.cte_fe55` measures both the serial and the
+parallel efficiency from how the charge of Fe 55 events falls with their
+distance from the amplifier, which takes several hundred images.
+
 
 Examples
 ========
@@ -338,6 +348,7 @@ justify the decisions made in this package.
     reports/bias
     reports/dark-current
     reports/gain
+    reports/cte
 
 |
 

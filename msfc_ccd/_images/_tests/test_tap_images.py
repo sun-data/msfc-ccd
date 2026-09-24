@@ -135,6 +135,42 @@ class AbstractTestAbstractTapImage(
         i = {a.axis_x: index_pair[a.axis_x] - num_blank, a.axis_y: index_pair[a.axis_y]}
         assert not np.any(np.isfinite(result.outputs[i]))
 
+    def test_hits_single(self, a: msfc_ccd.abc.AbstractTapData):
+        num_blank = a.camera.sensor.num_blank
+        charge = 600 * u.DN
+
+        # The dark level and the noise of the active pixels, so that pixels
+        # can be set to a known height above the dark level
+        level = np.median(a.active.outputs, axis=a.axis_xy)
+        deviation = np.abs(a.active.outputs - level)
+        sigma = 1.482602218505602 * np.median(deviation, axis=a.axis_xy)
+
+        outputs = a.outputs.copy()
+
+        # A single-pixel event
+        index = {a.axis_x: num_blank + 100, a.axis_y: 100}
+        outputs[index] = level + charge
+
+        # An event with one neighbor between the split and event thresholds
+        index_split = {a.axis_x: num_blank + 300, a.axis_y: 300}
+        index_neighbor = {a.axis_x: num_blank + 301, a.axis_y: 300}
+        outputs[index_split] = level + charge
+        outputs[index_neighbor] = level + 4 * sigma
+
+        b = a.replace(outputs=outputs)
+        result = b.hits(threshold_split=3)
+        result_all = b.hits()
+
+        i = {a.axis_x: index[a.axis_x] - num_blank, a.axis_y: index[a.axis_y]}
+        assert np.all(np.abs(result.outputs[i] - charge) < 1 * u.DN)
+
+        i = {
+            a.axis_x: index_split[a.axis_x] - num_blank,
+            a.axis_y: index_split[a.axis_y],
+        }
+        assert not np.any(np.isfinite(result.outputs[i]))
+        assert np.all(np.isfinite(result_all.outputs[i]))
+
     def test_gain(self, a: msfc_ccd.abc.AbstractTapData):
         gain = 2.5 * u.electron / u.DN
         fe55 = msfc_ccd.Fe55()
@@ -171,6 +207,76 @@ class AbstractTestAbstractTapImage(
         """A tap with too few events has no gain to report."""
         result = a.gain()
         assert np.all(np.isnan(result.outputs))
+
+    def test_cte_eper(self, a: msfc_ccd.abc.AbstractTapData):
+        sensor = a.camera.sensor
+        signal = 10000 * u.DN
+        cti = 5e-5
+
+        # A flat, and the charge its last active pixel leaves in the overscan
+        where_active = ~(a.where_blank() | a.where_overscan())
+        num_transfers = a.num_x - sensor.num_overscan
+        deferred = signal * cti * num_transfers
+        i = a.outputs.indices[a.axis_x]
+        overscan = np.where(i == num_transfers, 0.9, 0)
+        overscan = overscan + np.where(i == num_transfers + 1, 0.1, 0)
+        outputs = a.outputs + signal * where_active + deferred * overscan
+
+        result = a.replace(outputs=outputs).cte_eper()
+
+        assert isinstance(result, msfc_ccd.TapData)
+        assert a.axis_x not in result.outputs.shape
+        assert a.axis_y not in result.outputs.shape
+        assert na.unit(result.outputs).is_equivalent(u.percent)
+        cti_result = 1 - result.outputs.to(u.dimensionless_unscaled)
+        assert np.all(np.abs(cti_result - cti) < 0.02 * cti)
+
+    def test_cte_fe55(self, a: msfc_ccd.abc.AbstractTapData):
+        sensor = a.camera.sensor
+        gain = 2.5 * u.electron / u.DN
+        cti_x = 5e-5
+        cti_y = 1e-4
+        fe55 = msfc_ccd.Fe55()
+        rng = np.random.default_rng(seed=42)
+
+        num_x, num_y, step = 60, 29, 17
+        start_x = sensor.num_blank + 8
+        start_y = 16
+
+        # Single-pixel Fe 55 events on a grid, spaced to stay isolated
+        probability_beta = fe55.probability_k_beta / (
+            fe55.probability_k_alpha + fe55.probability_k_beta
+        )
+        where_beta = rng.random(size=(num_x, num_y)) < probability_beta
+        charge = np.where(where_beta, fe55.charge_k_beta, fe55.charge_k_alpha)
+        charge = charge / gain + rng.normal(scale=5, size=charge.shape) * u.DN
+
+        # The fraction lost to the transfers before each event is read out
+        transfers_x = start_x + 1 + step * np.arange(num_x)[:, np.newaxis]
+        transfers_y = start_y + 1 + step * np.arange(num_y)[np.newaxis, :]
+        charge = charge * (1 - cti_x * transfers_x - cti_y * transfers_y)
+        charge = na.ScalarArray(charge, axes=(a.axis_x, a.axis_y))
+
+        index = {
+            a.axis_x: slice(start_x, start_x + num_x * step, step),
+            a.axis_y: slice(start_y, start_y + num_y * step, step),
+        }
+        outputs = a.outputs.copy()
+        outputs[index] = outputs[index] + charge
+
+        result = a.replace(outputs=outputs).cte_fe55()
+
+        assert isinstance(result, msfc_ccd.TapData)
+        assert isinstance(result.outputs, na.Cartesian2dVectorArray)
+        cti_result = 1 - result.outputs.to(u.dimensionless_unscaled)
+        assert np.all(np.abs(cti_result.x - cti_x) < 0.1 * cti_x)
+        assert np.all(np.abs(cti_result.y - cti_y) < 0.1 * cti_y)
+
+    def test_cte_fe55_without_events(self, a: msfc_ccd.abc.AbstractTapData):
+        """A tap with too few events has no efficiency to report."""
+        result = a.cte_fe55()
+        assert np.all(np.isnan(result.outputs.x))
+        assert np.all(np.isnan(result.outputs.y))
 
     @classmethod
     def _flats(
