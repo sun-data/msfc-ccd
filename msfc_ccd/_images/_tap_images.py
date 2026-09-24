@@ -840,9 +840,8 @@ class AbstractTapData(
         negative parallel inefficiency of about :math:`10^{-6}`.
 
         The fit also averages over any columns with charge traps.
-        On a sensor with many of them, such as the grade 5 CCD in the ESIS
-        channel 3 camera, the traps dominate the result, and the serial
-        component should be taken from :meth:`cte_eper` instead.
+        On a sensor with many of them, the traps dominate the result,
+        and the serial component should be taken from :meth:`cte_eper` instead.
 
         Parameters
         ----------
@@ -866,9 +865,8 @@ class AbstractTapData(
         --------
         Estimate the charge transfer efficiency of the ESIS channel 3 camera
         from four Fe 55 exposures.
-        Four images are far too few for a precise result, and this is the
-        camera with the grade 5 CCD, so this only shows how the method is
-        called.
+        Four images are far too few for a precise result,
+        so this only shows how the method is called.
 
         .. jupyter-execute::
 

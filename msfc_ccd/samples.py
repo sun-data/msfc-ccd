@@ -30,9 +30,6 @@ An Fe 55 sample image from the ESIS channel 3 camera.
 
 Gathered by the MSFC sounding rocket team during camera testing and validation
 on 2017-07-12.
-
-This camera, serial number 9, has the grade 5 CCD,
-which has many columns with charge traps.
 """
 
 paths_fe55_esis3 = tuple(
