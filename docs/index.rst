@@ -102,6 +102,16 @@ Only the slope of that fit is the dark current; the intercept also contains
 the offset between the blank columns and the active pixels, and the fixed
 pattern of the sensor.
 
+**Flats measure the gain from their shot noise.**
+The difference of two flats gathered with the same illumination cancels the
+pattern of the illumination and the response of each pixel, leaving only shot
+noise and readout noise.
+The shot noise variance, in electrons, equals the signal, so
+:meth:`~msfc_ccd.abc.AbstractTapData.photon_transfer` traces out the variance
+against the signal, and
+:meth:`~msfc_ccd.abc.AbstractTapData.gain_photon_transfer` turns it into a
+gain, independent of the Fe 55 measurement below.
+
 **Fe 55 events are isolated single-pixel hits.**
 A 5.9 keV X-ray from an :math:`^{55}\text{Fe}` source releases a known number
 of electrons in one pixel, so the charge it leaves is a ruler for the gain.
@@ -224,6 +234,27 @@ different exposure lengths.
 
     # The slope of the signal against the exposure time is the dark current
     darks.taps.dark_current(axis_time).outputs.to("DN / s").ndarray
+
+|
+
+Measure the gain of each tap from a pair of flats, gathered two seconds apart
+with the same illumination.
+
+.. jupyter-execute::
+
+    # Load two consecutive images of a diffuse LED source
+    flats = msfc_ccd.fits.open(
+        path=na.ScalarArray(
+            ndarray=np.array([
+                msfc_ccd.samples.path_led_esis1,
+                msfc_ccd.samples.path_led_esis1_next,
+            ]),
+            axes=axis_time,
+        ),
+    )
+
+    # The ratio of the signal to the shot noise variance is the gain
+    flats.taps.gain_photon_transfer(axis_time).outputs.ndarray
 
 |
 
