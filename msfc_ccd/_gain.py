@@ -219,3 +219,90 @@ def _fit_gain(
         return np.nan
 
     return result.x[0]
+
+
+def _fit_cte(
+    charge: np.ndarray,
+    transfers_x: np.ndarray,
+    transfers_y: np.ndarray,
+    gain_min: float,
+    gain_max: float,
+    fe55: Fe55,
+) -> tuple[float, float]:
+    """
+    Fit the serial and parallel charge transfer inefficiency to event charges.
+
+    The input is an unbinned list of single-pixel event charges, in DN, and
+    the number of serial and parallel transfers of each event.
+
+    The model is the one used by :func:`_fit_gain`, except that the center of
+    each line falls linearly with the number of transfers,
+    by the charge transfer inefficiency of each transfer.
+    """
+    where = np.isfinite(charge)
+    charge = charge[where]
+    transfers_x = transfers_x[where]
+    transfers_y = transfers_y[where]
+
+    q_alpha = fe55.charge_k_alpha.to_value(u.electron)
+    q_beta = fe55.charge_k_beta.to_value(u.electron)
+
+    p_beta = fe55.probability_k_beta / (
+        fe55.probability_k_alpha + fe55.probability_k_beta
+    )
+    p_alpha = 1 - p_beta
+
+    # Locate the K-alpha peak as if there were no losses
+    gain = _fit_gain(charge, gain_min, gain_max, fe55)
+    if not np.isfinite(gain):
+        return np.nan, np.nan
+    center = q_alpha / gain
+
+    lower, upper = 0.80 * center, 1.30 * center
+    where = (lower < charge) & (charge < upper)
+    charge = charge[where]
+    transfers_x = transfers_x[where]
+    transfers_y = transfers_y[where]
+
+    # The fraction of the charge lost by an event at the far end of each axis,
+    # which is of order one and so suits the optimizer better than the
+    # inefficiency of a single transfer.
+    scale_x = max(transfers_x.max(), 1)
+    scale_y = max(transfers_y.max(), 1)
+    fraction_x = transfers_x / scale_x
+    fraction_y = transfers_y / scale_y
+
+    def neglog(p: np.ndarray) -> float:
+        center_0, width, background, loss_x, loss_y = p
+        center_alpha = center_0 * (1 - loss_x * fraction_x - loss_y * fraction_y)
+        center_beta = center_alpha * q_beta / q_alpha
+        cdf = scipy.stats.norm.cdf
+        pdf = scipy.stats.norm.pdf
+        norm_alpha = cdf(upper, center_alpha, width) - cdf(lower, center_alpha, width)
+        norm_beta = cdf(upper, center_beta, width) - cdf(lower, center_beta, width)
+        density = p_alpha * pdf(charge, center_alpha, width) / norm_alpha
+        density = density + p_beta * pdf(charge, center_beta, width) / norm_beta
+        density = (1 - background) * density + background / (upper - lower)
+        return -np.sum(np.log(np.maximum(density, 1e-300)))
+
+    bounds = [
+        (lower, upper / 1.1),
+        (1, (upper - lower) / 2),
+        (0, 1),
+        (-0.1, 0.1),
+        (-0.1, 0.1),
+    ]
+
+    result = scipy.optimize.minimize(
+        fun=neglog,
+        x0=np.array([center, 10.0, 0.2, 0, 0]),
+        method="Nelder-Mead",
+        bounds=bounds,
+        options=dict(maxiter=10000, maxfev=10000, xatol=1e-7, fatol=1e-6),
+    )
+    if not result.success:  # pragma: nocover
+        return np.nan, np.nan
+
+    _, _, _, loss_x, loss_y = result.x
+
+    return loss_x / scale_x, loss_y / scale_y
