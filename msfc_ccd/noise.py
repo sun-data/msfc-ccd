@@ -8,9 +8,11 @@ illumination and exposure length.
 
 import dataclasses
 import numpy as np
+import astropy.units as u
 import named_arrays as na
 from ._images.abc import AbstractTapData
-from ._measurements import TapDataT, _message_taps, _variance_difference
+from ._measurements import TapDataT, _axes_pixel, _message_taps
+from ._measurements import _variance_difference
 
 __all__ = [
     "readout",
@@ -22,6 +24,7 @@ def readout(
     images: TapDataT,
     axis: str,
     threshold: float = 5,
+    signal_max: u.Quantity = 100 * u.DN,
 ) -> TapDataT:
     r"""
     Estimate the readout noise of each tap from a sequence of dark images.
@@ -30,12 +33,20 @@ def readout(
     is computed, which removes the bias, the dark current and the fixed
     pattern noise, and leaves only the readout noise of the two images.
     The readout noise is then the standard deviation of the active pixels
+    outside the masked rows,
+    :meth:`~msfc_ccd.abc.AbstractTapData.where_masked`,
     in each difference image, divided by :math:`\sqrt{2}`,
     after rejecting pixels affected by cosmic rays or other spikes.
 
     The result has one fewer element along `axis` than the input,
     since it is defined for each pair of adjacent images.
     Take the mean along `axis` to estimate the readout noise of the camera.
+
+    This is the point at zero signal of the photon transfer curve computed
+    by :func:`photon_transfer`.
+    The shot noise of a pair of images with a mean signal above
+    `signal_max` would add to the readout noise, so such a pair cannot be
+    a pair of darks, and gives :obj:`numpy.nan`.
 
     Parameters
     ----------
@@ -49,11 +60,15 @@ def readout(
         deviations from the median are rejected.
         The standard deviation used for the rejection is estimated from the
         median absolute deviation, which is not affected by the spikes.
+    signal_max
+        The largest mean signal of a pair of images which is accepted as a
+        pair of darks.
 
     Returns
     -------
     A copy of `images`, of the same type, whose outputs are the readout
-    noise of each tap for each pair of adjacent images.
+    noise of each tap for each pair of adjacent images,
+    or :obj:`numpy.nan` for a pair which is not a pair of darks.
 
     Raises
     ------
@@ -63,20 +78,14 @@ def readout(
     if not isinstance(images, AbstractTapData):
         raise TypeError(_message_taps(images))
 
-    outputs = images.active.outputs
-    outputs_1 = outputs[{axis: slice(1, None)}]
-    outputs_0 = outputs[{axis: slice(None, -1)}]
+    ptc = photon_transfer(images, axis, threshold)
 
-    variance = _variance_difference(
-        difference=outputs_1 - outputs_0,
-        axis=images.axis_xy,
-        threshold=threshold,
-    )
+    where = ptc.inputs <= signal_max
 
     return dataclasses.replace(
         images,
-        inputs=images.inputs[{axis: slice(1, None)}],
-        outputs=np.sqrt(variance),
+        inputs=images.inputs[{axis: slice(1, None), **_axes_pixel(images)}],
+        outputs=np.sqrt(ptc.outputs) * np.where(where, 1, np.nan),
     )
 
 

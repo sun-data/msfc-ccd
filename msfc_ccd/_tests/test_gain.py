@@ -41,6 +41,8 @@ def test_fe55(a: msfc_ccd.abc.AbstractTapData):
     result = msfc_ccd.gain.fe55(a.replace(outputs=outputs))
 
     assert isinstance(result, msfc_ccd.TapData)
+    assert a.axis_x not in result.shape
+    assert a.axis_y not in result.shape
     assert a.axis_x not in result.outputs.shape
     assert a.axis_y not in result.outputs.shape
     assert na.unit(result.outputs).is_equivalent(u.electron / u.DN)
@@ -70,6 +72,47 @@ def test_photon_transfer(a: msfc_ccd.abc.AbstractTapData):
     result = msfc_ccd.gain.photon_transfer(b, axis)
 
     assert isinstance(result, msfc_ccd.TapData)
+    assert a.axis_x not in result.shape
+    assert a.axis_y not in result.shape
     assert set(result.outputs.shape) == {a.axis_tap_x, a.axis_tap_y}
     assert na.unit(result.outputs).is_equivalent(u.electron / u.DN)
     assert np.all(np.abs(result.outputs - gain) < 0.01 * gain)
+
+
+@pytest.mark.parametrize(
+    argnames="a",
+    argvalues=_taps,
+)
+def test_photon_transfer_faint(a: msfc_ccd.abc.AbstractTapData):
+    """A pair below the smallest signal of a flat is left out."""
+    axis = "_test_photon_transfer_faint"
+    axis_level = "_test_level"
+    signal = na.ScalarArray([50, 2000, 6000] * u.DN, axes=axis_level)
+    gain = 2.5 * u.electron / u.DN
+    b = _shared.flats(a, axis, signal, gain, readout_noise=4 * u.DN)
+
+    # Extra noise in the light-sensitive pixels of the faintest pair,
+    # which is not readout noise and would lower the gain a lot
+    rng = np.random.default_rng(seed=42)
+    where_active = ~(a.where_blank() | a.where_overscan())
+    outputs = b.outputs.copy()
+    faint = outputs[{axis_level: 0}]
+    noise = rng.normal(size=faint.ndarray.shape) * 30 * u.DN
+    noise = na.ScalarArray(noise, axes=faint.axes) * where_active
+    outputs[{axis_level: 0}] = faint + noise
+
+    result = msfc_ccd.gain.photon_transfer(b.replace(outputs=outputs), axis)
+    assert np.all(np.abs(result.outputs - gain) < 0.01 * gain)
+
+
+@pytest.mark.parametrize(
+    argnames="a",
+    argvalues=_taps,
+)
+def test_photon_transfer_darks(a: msfc_ccd.abc.AbstractTapData):
+    """Darks have no shot noise to measure a gain from."""
+    axis = "_test_photon_transfer_darks"
+    gain = 2.5 * u.electron / u.DN
+    b = _shared.flats(a, axis, 0 * u.DN, gain, readout_noise=4 * u.DN)
+    result = msfc_ccd.gain.photon_transfer(b, axis)
+    assert np.all(np.isnan(result.outputs))

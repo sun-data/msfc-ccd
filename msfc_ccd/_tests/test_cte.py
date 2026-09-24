@@ -51,6 +51,8 @@ def test_fe55(a: msfc_ccd.abc.AbstractTapData):
 
     assert isinstance(result, msfc_ccd.TapData)
     assert isinstance(result.outputs, na.Cartesian2dVectorArray)
+    assert a.axis_x not in result.shape
+    assert a.axis_y not in result.shape
     cti_result = 1 - result.outputs.to(u.dimensionless_unscaled)
     assert np.all(np.abs(cti_result.x - cti_x) < 0.1 * cti_x)
     assert np.all(np.abs(cti_result.y - cti_y) < 0.1 * cti_y)
@@ -88,8 +90,20 @@ def test_eper(a: msfc_ccd.abc.AbstractTapData):
     result = msfc_ccd.cte.eper(a.replace(outputs=outputs))
 
     assert isinstance(result, msfc_ccd.TapData)
+    assert a.axis_x not in result.shape
+    assert a.axis_y not in result.shape
     assert a.axis_x not in result.outputs.shape
     assert a.axis_y not in result.outputs.shape
     assert na.unit(result.outputs).is_equivalent(u.percent)
     cti_result = 1 - result.outputs.to(u.dimensionless_unscaled)
     assert np.all(np.abs(cti_result - cti) < 0.02 * cti)
+
+
+@pytest.mark.parametrize(
+    argnames="a",
+    argvalues=_taps,
+)
+def test_eper_dark(a: msfc_ccd.abc.AbstractTapData):
+    """A dark has no charge at the end of its rows to leave behind."""
+    result = msfc_ccd.cte.eper(a)
+    assert np.all(np.isnan(result.outputs))

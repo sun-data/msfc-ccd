@@ -11,7 +11,7 @@ import astropy.units as u
 import named_arrays as na
 from ._fe55 import Fe55, _fit_cte
 from ._images.abc import AbstractTapData
-from ._measurements import TapDataT, _message_taps
+from ._measurements import TapDataT, _axes_pixel, _fit_taps, _message_taps
 
 __all__ = [
     "fe55",
@@ -143,14 +143,13 @@ def fe55(
     if source is None:
         source = Fe55()
 
-    hits = images.hits(threshold, threshold_split)
+    charge = images.hits(threshold, threshold_split).outputs
 
     unit = u.electron / u.DN
     gain_min = gain_min.to_value(unit)
     gain_max = gain_max.to_value(unit)
 
     # The masked rows are not part of the image
-    charge = hits.outputs
     index_x = charge.indices[images.axis_x]
     index_y = charge.indices[images.axis_y]
     where_image = index_y >= images.camera.sensor.num_masked
@@ -160,39 +159,28 @@ def fe55(
     transfers_x = index_x + images.camera.sensor.num_blank + 1
     transfers_y = index_y + 1
 
-    shape = charge.shape
-    axes_tap = (images.axis_tap_y, images.axis_tap_x)
-    axes_tap = tuple(a for a in axes_tap if a in shape)
-    axes_pooled = tuple(a for a in shape if a not in axes_tap)
-    shape_tap = tuple(shape[a] for a in axes_tap)
+    def fit(
+        charge: np.ndarray,
+        transfers_x: np.ndarray,
+        transfers_y: np.ndarray,
+    ) -> tuple[float, float]:
+        return _fit_cte(charge, transfers_x, transfers_y, gain_min, gain_max, source)
 
-    def flatten(a: na.AbstractScalar) -> np.ndarray:
-        a = na.broadcast_to(a, shape)
-        a = a.ndarray_aligned(axes_tap + axes_pooled)
-        return np.asarray(a).reshape(shape_tap + (-1,))
-
-    charge = flatten(charge.to(u.DN).value)
-    transfers_x = flatten(transfers_x)
-    transfers_y = flatten(transfers_y)
-
-    cti_x = np.empty(shape_tap)
-    cti_y = np.empty(shape_tap)
-    for index in np.ndindex(*shape_tap):
-        cti_x[index], cti_y[index] = _fit_cte(
-            charge=charge[index],
-            transfers_x=transfers_x[index],
-            transfers_y=transfers_y[index],
-            gain_min=gain_min,
-            gain_max=gain_max,
-            fe55=source,
-        )
+    (cti_x, cti_y), axes_pooled = _fit_taps(
+        images=images,
+        fit=fit,
+        num=2,
+        charge=charge.to(u.DN).value,
+        transfers_x=transfers_x,
+        transfers_y=transfers_y,
+    )
 
     return dataclasses.replace(
         images,
         inputs=images.inputs[{a: 0 for a in axes_pooled}],
         outputs=na.Cartesian2dVectorArray(
-            x=na.ScalarArray((1 - cti_x) * 100 * u.percent, axes=axes_tap),
-            y=na.ScalarArray((1 - cti_y) * 100 * u.percent, axes=axes_tap),
+            x=(1 - cti_x) * 100 * u.percent,
+            y=(1 - cti_y) * 100 * u.percent,
         ),
     )
 
@@ -200,6 +188,7 @@ def fe55(
 def eper(
     images: TapDataT,
     num_active: int = 10,
+    signal_min: u.Quantity = 100 * u.DN,
 ) -> TapDataT:
     r"""
     Estimate the serial charge transfer efficiency of each tap from a flat.
@@ -241,6 +230,8 @@ def eper(
     The overscan columns of a dark image sit within about 0.4 DN of the
     bias, which matters only for faint flats;
     subtract a dark image first to remove it.
+    An image whose signal is below `signal_min` cannot be a flat,
+    and gives :obj:`numpy.nan`.
 
     Parameters
     ----------
@@ -250,11 +241,14 @@ def eper(
     num_active
         The number of active columns at the end of each row used to
         measure the signal.
+    signal_min
+        The smallest signal of an image which is accepted as a flat.
 
     Returns
     -------
     A copy of `images`, of the same type, whose outputs are the serial
-    charge transfer efficiency of each tap for each image.
+    charge transfer efficiency of each tap for each image,
+    or :obj:`numpy.nan` for an image which is not a flat.
 
     Raises
     ------
@@ -292,7 +286,10 @@ def eper(
 
     cti = deferred / (signal * num_transfers)
 
+    where = signal >= signal_min
+
     return dataclasses.replace(
         images,
-        outputs=(1 - cti).to(u.percent),
+        inputs=images.inputs[_axes_pixel(images)],
+        outputs=(1 - cti).to(u.percent) * np.where(where, 1, np.nan),
     )
