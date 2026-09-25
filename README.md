@@ -170,6 +170,17 @@ black .
 ruff check .
 ```
 
+The notebooks in the documentation must be committed without their outputs, which continuous integration checks using [nbstripout](https://github.com/kynan/nbstripout).
+Strip a notebook before committing it:
+```shell
+pip install nbstripout
+nbstripout docs/reports/*.ipynb
+```
+or install nbstripout as a git filter, which strips the notebooks automatically as they are staged:
+```shell
+nbstripout --install
+```
+
 To build the documentation locally:
 ```shell
 pip install -e .[doc]
