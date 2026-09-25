@@ -51,6 +51,13 @@ def master(
         so with fewer than ``1 / proportion`` images
         nothing is removed.
 
+        This trims far more than :func:`current`, which trims 1 percent of
+        the pixels of each image.
+        Here the trim is along the sequence for each pixel, and a cosmic ray
+        affects only one or two of the few images in the sequence, while
+        :func:`current` trims across the pixels of an image, where the hot
+        pixels are part of the dark current and must be kept.
+
     Returns
     -------
     A copy of `images`, of the same type, whose outputs are the master dark,
