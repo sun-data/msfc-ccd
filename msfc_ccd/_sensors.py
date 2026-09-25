@@ -209,7 +209,8 @@ class TeledyneCCD230(
         """
         result = self.num_pixel
         if self.readout_mode == "transfer":
-            return result.replace(y=result.y // 2)
+            result = result.replace(y=result.y // 2)
+        return result
 
     @property
     def width_package(self) -> na.Cartesian2dVectorArray:
@@ -222,21 +223,38 @@ class TeledyneCCD230(
     @classmethod
     def _frac_Qd_Qdo(cls, temperature: u.Quantity | na.AbstractScalar):
         T = temperature
-        return 122 * T * np.square(T) * np.exp(-6400 * u.K / T) / u.K**3
+        return 1.14e6 * T * np.square(T) * np.exp(-9080 * u.K / T) / u.K**3
 
     def dark_current(
         self,
         temperature: None | u.Quantity | na.AbstractScalar = None,
     ):
-        """
+        r"""
         Calculate the rate of charge accumulation when the sensor is not illuminated.
+
+        This is the typical dark current given by the datasheet of the
+        CCD230-42, version 5,
+
+        .. math::
+
+            \frac{Q_d}{Q_{do}} = 1.14 \times 10^6 \, T^3 e^{-9080 / T},
+
+        where :math:`Q_d` is the dark current at the temperature :math:`T`,
+        in kelvin, and :math:`Q_{do}` is the dark current at 293 K,
+        scaled so that the dark current at 248 K is the typical
+        0.2 electron / pixel / s.
+
+        The datasheet only claims this model from 230 K to 300 K,
+        and warns that below 230 K other sources of dark current,
+        which depend less steeply on temperature, may dominate.
+        The ESIS cameras run below that range, and their measured dark current
+        there is far above this model.
 
         Parameters
         ----------
         temperature
             The temperature of the sensor.
             If :obj:`None`, the value of :attr:`temperature` is used.
-
 
         .. nblinkgallery::
             :caption: Examples
