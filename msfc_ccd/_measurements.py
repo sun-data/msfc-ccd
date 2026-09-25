@@ -27,6 +27,19 @@ def _message_taps(images: object) -> str:
     )
 
 
+def _num(images: AbstractCameraData, axis: str) -> int:
+    """Count the images along a logical axis, which is zero if it is missing."""
+    return images.shape.get(axis, 0)
+
+
+def _message_sequence(images: AbstractCameraData, axis: str) -> str:
+    """Explain that a measurement needs a pair of images to compare."""
+    return (
+        f"`images` must be a sequence of at least two images along {axis!r}, "
+        f"got {_num(images, axis)}."
+    )
+
+
 def _axes_pixel(images: AbstractCameraData) -> dict[str, int]:
     """Index the pixel axes of the header of a result which has none."""
     return {images.axis_x: 0, images.axis_y: 0}

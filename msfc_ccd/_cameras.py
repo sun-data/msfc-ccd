@@ -31,6 +31,11 @@ class AbstractCamera(
 
     @property
     @abc.abstractmethod
+    def bits_adc(self) -> int:
+        """The number of bits supported by the analog-to-digital converter."""
+
+    @property
+    @abc.abstractmethod
     def axis_tap_x(self) -> str:
         """The name of the logical axis corresponding to changing horizontal tap."""
 

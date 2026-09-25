@@ -11,6 +11,7 @@ import astropy.units as u
 from ._fe55 import Fe55, _fit_gain
 from ._images.abc import AbstractTapData
 from ._measurements import TapDataT, _axes_pixel, _fit_taps, _message_taps
+from ._measurements import _message_sequence, _num
 from ._measurements import _variance_difference
 from . import noise
 
@@ -72,6 +73,8 @@ def fe55(
     ------
     TypeError
         If `images` is not the images from each tap.
+    ValueError
+        If `gain_min` is not smaller than `gain_max`.
 
     Examples
     --------
@@ -87,6 +90,11 @@ def fe55(
     """
     if not isinstance(images, AbstractTapData):
         raise TypeError(_message_taps(images))
+
+    if gain_min >= gain_max:
+        raise ValueError(
+            f"`gain_min`, {gain_min}, must be smaller than `gain_max`, {gain_max}."
+        )
 
     if source is None:
         source = Fe55()
@@ -119,6 +127,7 @@ def photon_transfer(
     axis: str,
     threshold: float = 5,
     signal_min: u.Quantity = 100 * u.DN,
+    fraction_saturated: float = 0.001,
 ) -> TapDataT:
     r"""
     Measure the gain of each tap from a sequence of flat images.
@@ -132,8 +141,10 @@ def photon_transfer(
 
     pooled over every axis except the two tap axes,
     so pairs of flats at several levels of illumination can be combined.
-    Pairs of images whose signal is below `signal_min` cannot be flats,
-    and are left out.
+    A pair of images whose signal is below `signal_min` cannot be a pair
+    of flats, and raises an error,
+    as do flats which have no shot noise left after the readout noise is
+    removed.
     The readout noise, :math:`\sigma_r`, is measured from the blank columns
     of the same pairs of images, where there is no shot noise,
     so it follows any change in the noise of the camera during the test.
@@ -162,16 +173,25 @@ def photon_transfer(
     signal_min
         The smallest signal of a pair of images which is accepted as a pair
         of flats.
+    fraction_saturated
+        Passed to :func:`msfc_ccd.noise.photon_transfer`.
 
     Returns
     -------
     A copy of `images`, of the same type, whose outputs are the gain of each
-    tap, or :obj:`numpy.nan` for a tap with no pair of flats.
+    tap.
 
     Raises
     ------
     TypeError
         If `images` is not the images from each tap.
+    ValueError
+        If there are fewer than two images along `axis`,
+        a pair of them has a signal below `signal_min`,
+        the flats have no shot noise left after the readout noise is
+        removed,
+        or :func:`msfc_ccd.noise.photon_transfer` finds too many
+        saturated pixels.
 
     Examples
     --------
@@ -200,7 +220,16 @@ def photon_transfer(
     if not isinstance(images, AbstractTapData):
         raise TypeError(_message_taps(images))
 
-    ptc = noise.photon_transfer(images, axis, threshold)
+    if _num(images, axis) < 2:
+        raise ValueError(_message_sequence(images, axis))
+
+    ptc = noise.photon_transfer(images, axis, threshold, fraction_saturated)
+
+    if np.any(ptc.inputs < signal_min):
+        raise ValueError(
+            f"A pair of images has a mean signal of {ptc.inputs.min().ndarray:.1f}, "
+            "below `signal_min`, so it is not a pair of flats."
+        )
 
     outputs = images.outputs
     outputs = outputs[{images.axis_x: images.where_blank(num=25)}]
@@ -215,12 +244,14 @@ def photon_transfer(
     axes_tap = (images.axis_tap_x, images.axis_tap_y)
     axes_pooled = tuple(a for a in ptc.outputs.shape if a not in axes_tap)
 
-    where = ptc.inputs >= signal_min
-    num = where.sum(axes_pooled)
+    signal = ptc.inputs.sum(axes_pooled)
+    variance = (ptc.outputs - variance_readout).sum(axes_pooled)
 
-    signal = (ptc.inputs * where).sum(axes_pooled)
-    variance = ((ptc.outputs - variance_readout) * where).sum(axes_pooled)
-    variance = variance * np.where(num > 0, 1, np.nan)
+    if np.any(variance <= 0):
+        raise ValueError(
+            "The flats have no shot noise left after the readout noise is "
+            "removed, so they cannot measure the gain."
+        )
 
     return dataclasses.replace(
         images,

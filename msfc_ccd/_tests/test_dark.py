@@ -183,6 +183,16 @@ def test_current_same_exposure(a: msfc_ccd.abc.AbstractTapData):
 def test_current_flats(a: msfc_ccd.abc.AbstractTapData):
     """Images far brighter than a dark are not darks."""
     axis = "_test_current_flats"
-    rate = 1000 * u.DN / u.s
-    result = msfc_ccd.dark.current(_darks(a, axis, rate), axis)
-    assert np.all(np.isnan(result.outputs))
+    b = _darks(a, axis, 1000 * u.DN / u.s)
+    with pytest.raises(ValueError, match="signal_max"):
+        msfc_ccd.dark.current(b, axis)
+
+
+@pytest.mark.parametrize(
+    argnames="a",
+    argvalues=_images + _taps,
+)
+def test_master_missing_axis(a: msfc_ccd.abc.AbstractCameraData):
+    """There is nothing to average along an axis the images do not have."""
+    with pytest.raises(ValueError, match="no axis"):
+        msfc_ccd.dark.master(a, "_test_master_missing_axis")

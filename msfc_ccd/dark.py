@@ -55,7 +55,15 @@ def master(
     -------
     A copy of `images`, of the same type, whose outputs are the master dark,
     without `axis`.
+
+    Raises
+    ------
+    ValueError
+        If the images have no axis `axis`.
     """
+    if axis not in images.shape:
+        raise ValueError(f"`images` has no axis {axis!r} to average along.")
+
     outputs = na.mean_trimmed(
         a=images.outputs,
         q=proportion,
@@ -106,8 +114,8 @@ def current(
 
     Images which all requested the same exposure length have no slope to
     fit, and raise an error.
-    A tap whose signal is above `signal_max` in any of the images cannot be
-    a sequence of darks, and gives :obj:`numpy.nan`.
+    An image whose signal is above `signal_max` cannot be a dark,
+    and raises an error too.
 
     Parameters
     ----------
@@ -133,8 +141,7 @@ def current(
     Returns
     -------
     A copy of `images`, of the same type, whose outputs are the dark current
-    rate of each tap, or :obj:`numpy.nan` for a tap whose images are not
-    darks.
+    rate of each tap.
 
     Raises
     ------
@@ -142,7 +149,8 @@ def current(
         If `images` is not the images from each tap.
     ValueError
         If the images did not request at least two different exposure
-        lengths along `axis`.
+        lengths along `axis`, or one of them has a signal above
+        `signal_max`.
 
     Examples
     --------
@@ -198,7 +206,11 @@ def current(
     )
     timedelta = images.inputs.timedelta
 
-    where = np.all(signal <= signal_max, axis=axis)
+    if np.any(signal > signal_max):
+        raise ValueError(
+            f"An image has a signal of {signal.max().ndarray:.1f}, "
+            "above `signal_max`, so it is not a dark."
+        )
 
     signal = signal - signal.mean(axis)
     timedelta = timedelta - timedelta.mean(axis)
@@ -208,5 +220,5 @@ def current(
     return dataclasses.replace(
         images,
         inputs=images.inputs[{axis: 0, **_axes_pixel(images)}],
-        outputs=rate * np.where(where, 1, np.nan),
+        outputs=rate,
     )

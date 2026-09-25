@@ -105,5 +105,19 @@ def test_eper(a: msfc_ccd.abc.AbstractTapData):
 )
 def test_eper_dark(a: msfc_ccd.abc.AbstractTapData):
     """A dark has no charge at the end of its rows to leave behind."""
-    result = msfc_ccd.cte.eper(a)
-    assert np.all(np.isnan(result.outputs))
+    with pytest.raises(ValueError, match="signal_min"):
+        msfc_ccd.cte.eper(a)
+
+
+@pytest.mark.parametrize(
+    argnames="a",
+    argvalues=_taps,
+)
+def test_fe55_gain_range(a: msfc_ccd.abc.AbstractTapData):
+    """The gain range must not be empty."""
+    with pytest.raises(ValueError, match="gain_min"):
+        msfc_ccd.cte.fe55(
+            a,
+            gain_min=5 * u.electron / u.DN,
+            gain_max=2 * u.electron / u.DN,
+        )

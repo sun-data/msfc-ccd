@@ -107,6 +107,8 @@ def fe55(
     ------
     TypeError
         If `images` is not the images from each tap.
+    ValueError
+        If `gain_min` is not smaller than `gain_max`.
 
     Examples
     --------
@@ -139,6 +141,11 @@ def fe55(
     """
     if not isinstance(images, AbstractTapData):
         raise TypeError(_message_taps(images))
+
+    if gain_min >= gain_max:
+        raise ValueError(
+            f"`gain_min`, {gain_min}, must be smaller than `gain_max`, {gain_max}."
+        )
 
     if source is None:
         source = Fe55()
@@ -231,7 +238,7 @@ def eper(
     bias, which matters only for faint flats;
     subtract a dark image first to remove it.
     An image whose signal is below `signal_min` cannot be a flat,
-    and gives :obj:`numpy.nan`.
+    and raises an error.
 
     Parameters
     ----------
@@ -247,13 +254,14 @@ def eper(
     Returns
     -------
     A copy of `images`, of the same type, whose outputs are the serial
-    charge transfer efficiency of each tap for each image,
-    or :obj:`numpy.nan` for an image which is not a flat.
+    charge transfer efficiency of each tap for each image.
 
     Raises
     ------
     TypeError
         If `images` is not the images from each tap.
+    ValueError
+        If an image has a signal below `signal_min`.
 
     Examples
     --------
@@ -284,12 +292,16 @@ def eper(
     deferred = outputs[{images.axis_x: slice_overscan}].sum(images.axis_x)
     deferred = deferred.mean(images.axis_y)
 
-    cti = deferred / (signal * num_transfers)
+    if np.any(signal < signal_min):
+        raise ValueError(
+            f"An image has a signal of {signal.min().ndarray:.1f} at the end of "
+            "its rows, below `signal_min`, so it is not a flat."
+        )
 
-    where = signal >= signal_min
+    cti = deferred / (signal * num_transfers)
 
     return dataclasses.replace(
         images,
         inputs=images.inputs[_axes_pixel(images)],
-        outputs=(1 - cti).to(u.percent) * np.where(where, 1, np.nan),
+        outputs=(1 - cti).to(u.percent),
     )

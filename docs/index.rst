@@ -97,10 +97,11 @@ such as a sequence of darks, a pair of flats or an Fe 55 exposure,
 so those measurements are functions instead,
 grouped by the quantity they measure into :mod:`msfc_ccd.noise`,
 :mod:`msfc_ccd.dark`, :mod:`msfc_ccd.gain` and :mod:`msfc_ccd.cte`.
-The measurements of gain, charge transfer efficiency, readout noise and dark
-current check the signal of their images, or the events they find in them,
-and give :obj:`numpy.nan` rather than a number when the images are clearly
+The measurements check the signal of their images, and raise a
+:class:`ValueError` rather than return a number when the images are clearly
 the wrong kind, such as a dark passed to :func:`msfc_ccd.cte.eper`.
+Only the :math:`^{55}\text{Fe}` measurements return :obj:`numpy.nan`,
+for a tap with too few events to fit.
 
 **Readout noise comes from a sequence of darks.**
 Differencing two adjacent dark images cancels the bias, the dark current and

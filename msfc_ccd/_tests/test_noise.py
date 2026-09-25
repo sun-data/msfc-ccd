@@ -90,5 +90,46 @@ def test_readout_flats(a: msfc_ccd.abc.AbstractTapData):
     axis = "_test_readout_flats"
     gain = 2.5 * u.electron / u.DN
     b = _shared.flats(a, axis, 4000 * u.DN, gain, readout_noise=4 * u.DN)
-    result = msfc_ccd.noise.readout(b, axis)
-    assert np.all(np.isnan(result.outputs))
+    with pytest.raises(ValueError, match="signal_max"):
+        msfc_ccd.noise.readout(b, axis)
+
+
+@pytest.mark.parametrize(
+    argnames="a",
+    argvalues=_taps,
+)
+def test_readout_single(a: msfc_ccd.abc.AbstractTapData):
+    """A single image has no pair to difference."""
+    with pytest.raises(ValueError, match="at least two"):
+        msfc_ccd.noise.readout(a, "_test_readout_single")
+
+
+@pytest.mark.parametrize(
+    argnames="a",
+    argvalues=_taps,
+)
+def test_photon_transfer_single(a: msfc_ccd.abc.AbstractTapData):
+    """A single image has no pair to difference."""
+    with pytest.raises(ValueError, match="at least two"):
+        msfc_ccd.noise.photon_transfer(a, "_test_photon_transfer_single")
+
+
+@pytest.mark.parametrize(
+    argnames="a",
+    argvalues=_taps,
+)
+def test_photon_transfer_saturated(a: msfc_ccd.abc.AbstractTapData):
+    """Pixels at the top of the range of the ADC have lost part of their noise."""
+    axis = "_test_photon_transfer_saturated"
+    gain = 2.5 * u.electron / u.DN
+    b = _shared.flats(a, axis, 4000 * u.DN, gain, readout_noise=4 * u.DN)
+    ceiling = (2**a.camera.bits_adc - 1) * u.DN
+    num_blank = a.camera.sensor.num_blank
+    outputs = b.outputs.copy()
+    index = {
+        a.axis_x: slice(num_blank + 100, num_blank + 200),
+        a.axis_y: slice(100, 200),
+    }
+    outputs[index] = ceiling
+    with pytest.raises(ValueError, match="fraction_saturated"):
+        msfc_ccd.noise.photon_transfer(b.replace(outputs=outputs), axis)

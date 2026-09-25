@@ -84,25 +84,13 @@ def test_photon_transfer(a: msfc_ccd.abc.AbstractTapData):
     argvalues=_taps,
 )
 def test_photon_transfer_faint(a: msfc_ccd.abc.AbstractTapData):
-    """A pair below the smallest signal of a flat is left out."""
+    """A pair below the smallest signal of a flat is not a pair of flats."""
     axis = "_test_photon_transfer_faint"
-    axis_level = "_test_level"
-    signal = na.ScalarArray([50, 2000, 6000] * u.DN, axes=axis_level)
+    signal = na.ScalarArray([50, 2000, 6000] * u.DN, axes="_test_level")
     gain = 2.5 * u.electron / u.DN
     b = _shared.flats(a, axis, signal, gain, readout_noise=4 * u.DN)
-
-    # Extra noise in the light-sensitive pixels of the faintest pair,
-    # which is not readout noise and would lower the gain a lot
-    rng = np.random.default_rng(seed=42)
-    where_active = ~(a.where_blank() | a.where_overscan())
-    outputs = b.outputs.copy()
-    faint = outputs[{axis_level: 0}]
-    noise = rng.normal(size=faint.ndarray.shape) * 30 * u.DN
-    noise = na.ScalarArray(noise, axes=faint.axes) * where_active
-    outputs[{axis_level: 0}] = faint + noise
-
-    result = msfc_ccd.gain.photon_transfer(b.replace(outputs=outputs), axis)
-    assert np.all(np.abs(result.outputs - gain) < 0.01 * gain)
+    with pytest.raises(ValueError, match="signal_min"):
+        msfc_ccd.gain.photon_transfer(b, axis)
 
 
 @pytest.mark.parametrize(
@@ -114,5 +102,49 @@ def test_photon_transfer_darks(a: msfc_ccd.abc.AbstractTapData):
     axis = "_test_photon_transfer_darks"
     gain = 2.5 * u.electron / u.DN
     b = _shared.flats(a, axis, 0 * u.DN, gain, readout_noise=4 * u.DN)
-    result = msfc_ccd.gain.photon_transfer(b, axis)
-    assert np.all(np.isnan(result.outputs))
+    with pytest.raises(ValueError, match="signal_min"):
+        msfc_ccd.gain.photon_transfer(b, axis)
+
+
+@pytest.mark.parametrize(
+    argnames="a",
+    argvalues=_taps,
+)
+def test_photon_transfer_no_shot_noise(a: msfc_ccd.abc.AbstractTapData):
+    """Flats noisier in the blank columns than in the image have no shot noise."""
+    axis = "_test_photon_transfer_no_shot_noise"
+    num = 4
+    where_active = ~(a.where_blank() | a.where_overscan())
+    rng = np.random.default_rng(seed=42)
+    noise = na.ScalarArray(
+        ndarray=rng.normal(size=(num,) + a.outputs.ndarray.shape),
+        axes=(axis,) + a.outputs.axes,
+    )
+    noise = noise * np.where(a.where_blank(), 8 * u.DN, 4 * u.DN)
+    outputs = a.outputs + 2000 * u.DN * where_active + noise
+    with pytest.raises(ValueError, match="shot noise"):
+        msfc_ccd.gain.photon_transfer(a.replace(outputs=outputs), axis)
+
+
+@pytest.mark.parametrize(
+    argnames="a",
+    argvalues=_taps,
+)
+def test_fe55_gain_range(a: msfc_ccd.abc.AbstractTapData):
+    """The gain range must not be empty."""
+    with pytest.raises(ValueError, match="gain_min"):
+        msfc_ccd.gain.fe55(
+            a,
+            gain_min=5 * u.electron / u.DN,
+            gain_max=2 * u.electron / u.DN,
+        )
+
+
+@pytest.mark.parametrize(
+    argnames="a",
+    argvalues=_taps,
+)
+def test_photon_transfer_single(a: msfc_ccd.abc.AbstractTapData):
+    """A single image has no pair to difference."""
+    with pytest.raises(ValueError, match="at least two"):
+        msfc_ccd.gain.photon_transfer(a, "_test_photon_transfer_single")
