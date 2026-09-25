@@ -1,6 +1,6 @@
 """Helpers shared by the modules that measure the properties of a camera."""
 
-from typing import TypeVar
+from typing import Callable, TypeVar
 import numpy as np
 import named_arrays as na
 from ._images.abc import AbstractCameraData, AbstractTapData
@@ -25,6 +25,57 @@ def _message_taps(images: object) -> str:
         f"got `{type(images).__name__}`. "
         "Pass `images.taps` instead."
     )
+
+
+def _num(images: AbstractCameraData, axis: str) -> int:
+    """Count the images along a logical axis, which is zero if it is missing."""
+    return images.shape.get(axis, 0)
+
+
+def _message_sequence(images: AbstractCameraData, axis: str) -> str:
+    """Explain that a measurement needs a pair of images to compare."""
+    return (
+        f"`images` must be a sequence of at least two images along {axis!r}, "
+        f"got {_num(images, axis)}."
+    )
+
+
+def _axes_pixel(images: AbstractCameraData) -> dict[str, int]:
+    """Index the pixel axes of the header of a result which has none."""
+    return {images.axis_x: 0, images.axis_y: 0}
+
+
+def _fit_taps(
+    images: AbstractTapData,
+    fit: Callable[..., tuple[float, ...]],
+    num: int,
+    **arrays: na.AbstractScalar,
+) -> tuple[list[na.ScalarArray], tuple[str, ...]]:
+    """
+    Fit each tap separately, pooling every other axis.
+
+    `arrays` are broadcast against each other, and `fit` is called once for
+    each tap with the values of each array in that tap as a flat
+    :class:`numpy.ndarray`.
+    It must return `num` numbers, which are gathered into arrays over the tap
+    axes.
+    The axes which were pooled are returned as well.
+    """
+    shape = na.shape_broadcasted(*arrays.values())
+    axes_tap = (images.axis_tap_y, images.axis_tap_x)
+    shape_tap = {a: shape[a] for a in axes_tap if a in shape}
+    axes_pooled = tuple(a for a in shape if a not in shape_tap)
+
+    results = [na.ScalarArray.empty(shape_tap) for _ in range(num)]
+    for index in na.ndindex(shape_tap):
+        values = {
+            name: na.broadcast_to(array, shape)[index].ndarray.reshape(-1)
+            for name, array in arrays.items()
+        }
+        for result, value in zip(results, fit(**values)):
+            result[index] = value
+
+    return results, axes_pooled
 
 
 def _variance_difference(

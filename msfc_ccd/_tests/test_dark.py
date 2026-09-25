@@ -74,7 +74,10 @@ def _darks(
             outputs[index] = 60000 * u.DN
 
     return a.replace(
-        inputs=a.inputs.replace(timedelta=timedelta),
+        inputs=a.inputs.replace(
+            timedelta=timedelta,
+            timedelta_requested=timedelta,
+        ),
         outputs=outputs,
     )
 
@@ -116,6 +119,8 @@ def test_current(a: msfc_ccd.abc.AbstractTapData):
     result = msfc_ccd.dark.current(_darks(a, axis, rate), axis)
 
     assert isinstance(result, msfc_ccd.TapData)
+    assert a.axis_x not in result.shape
+    assert a.axis_y not in result.shape
     assert axis not in result.outputs.shape
     assert a.axis_x not in result.outputs.shape
     assert a.axis_y not in result.outputs.shape
@@ -156,3 +161,38 @@ def test_current_linear(a: msfc_ccd.abc.AbstractTapData):
     long = msfc_ccd.dark.current(b[{axis: slice(2, None)}], axis)
 
     assert np.all(np.abs(long.outputs - short.outputs) < 0.01 * rate)
+
+
+@pytest.mark.parametrize(
+    argnames="a",
+    argvalues=_taps,
+)
+def test_current_same_exposure(a: msfc_ccd.abc.AbstractTapData):
+    """Darks of a single exposure length have no slope to fit."""
+    axis = "_test_current_same_exposure"
+    b = _darks(a, axis, 0.05 * u.DN / u.s)
+    b = b.replace(inputs=b.inputs.replace(timedelta_requested=2 * u.s))
+    with pytest.raises(ValueError, match="two"):
+        msfc_ccd.dark.current(b, axis)
+
+
+@pytest.mark.parametrize(
+    argnames="a",
+    argvalues=_taps,
+)
+def test_current_flats(a: msfc_ccd.abc.AbstractTapData):
+    """Images far brighter than a dark are not darks."""
+    axis = "_test_current_flats"
+    b = _darks(a, axis, 1000 * u.DN / u.s)
+    with pytest.raises(ValueError, match="signal_max"):
+        msfc_ccd.dark.current(b, axis)
+
+
+@pytest.mark.parametrize(
+    argnames="a",
+    argvalues=_images + _taps,
+)
+def test_master_missing_axis(a: msfc_ccd.abc.AbstractCameraData):
+    """There is nothing to average along an axis the images do not have."""
+    with pytest.raises(ValueError, match="no axis"):
+        msfc_ccd.dark.master(a, "_test_master_missing_axis")

@@ -8,9 +8,12 @@ illumination and exposure length.
 
 import dataclasses
 import numpy as np
+import astropy.units as u
 import named_arrays as na
 from ._images.abc import AbstractTapData
-from ._measurements import TapDataT, _message_taps, _variance_difference
+from ._measurements import TapDataT, _axes_pixel, _message_taps
+from ._measurements import _message_sequence, _num
+from ._measurements import _variance_difference
 
 __all__ = [
     "readout",
@@ -22,6 +25,7 @@ def readout(
     images: TapDataT,
     axis: str,
     threshold: float = 5,
+    signal_max: u.Quantity = 100 * u.DN,
 ) -> TapDataT:
     r"""
     Estimate the readout noise of each tap from a sequence of dark images.
@@ -30,12 +34,20 @@ def readout(
     is computed, which removes the bias, the dark current and the fixed
     pattern noise, and leaves only the readout noise of the two images.
     The readout noise is then the standard deviation of the active pixels
+    outside the masked rows,
+    :meth:`~msfc_ccd.abc.AbstractTapData.where_masked`,
     in each difference image, divided by :math:`\sqrt{2}`,
     after rejecting pixels affected by cosmic rays or other spikes.
 
     The result has one fewer element along `axis` than the input,
     since it is defined for each pair of adjacent images.
     Take the mean along `axis` to estimate the readout noise of the camera.
+
+    This is the point at zero signal of the photon transfer curve computed
+    by :func:`photon_transfer`.
+    The shot noise of a pair of images with a mean signal above
+    `signal_max` would add to the readout noise, so such a pair cannot be
+    a pair of darks, and raises an error.
 
     Parameters
     ----------
@@ -49,6 +61,9 @@ def readout(
         deviations from the median are rejected.
         The standard deviation used for the rejection is estimated from the
         median absolute deviation, which is not affected by the spikes.
+    signal_max
+        The largest mean signal of a pair of images which is accepted as a
+        pair of darks.
 
     Returns
     -------
@@ -59,24 +74,28 @@ def readout(
     ------
     TypeError
         If `images` is not the images from each tap.
+    ValueError
+        If there are fewer than two images along `axis`,
+        or a pair of them has a mean signal above `signal_max`.
     """
     if not isinstance(images, AbstractTapData):
         raise TypeError(_message_taps(images))
 
-    outputs = images.active.outputs
-    outputs_1 = outputs[{axis: slice(1, None)}]
-    outputs_0 = outputs[{axis: slice(None, -1)}]
+    if _num(images, axis) < 2:
+        raise ValueError(_message_sequence(images, axis))
 
-    variance = _variance_difference(
-        difference=outputs_1 - outputs_0,
-        axis=images.axis_xy,
-        threshold=threshold,
-    )
+    ptc = photon_transfer(images, axis, threshold)
+
+    if np.any(ptc.inputs > signal_max):
+        raise ValueError(
+            f"A pair of images has a mean signal of {ptc.inputs.max().ndarray:.1f}, "
+            "above `signal_max`, so it is not a pair of darks."
+        )
 
     return dataclasses.replace(
         images,
-        inputs=images.inputs[{axis: slice(1, None)}],
-        outputs=np.sqrt(variance),
+        inputs=images.inputs[{axis: slice(1, None), **_axes_pixel(images)}],
+        outputs=np.sqrt(ptc.outputs),
     )
 
 
@@ -84,6 +103,7 @@ def photon_transfer(
     images: AbstractTapData,
     axis: str,
     threshold: float = 5,
+    fraction_saturated: float = 0.001,
 ) -> na.FunctionArray[na.ScalarArray, na.ScalarArray]:
     r"""
     Compute the photon transfer curve of each tap from a sequence of flats.
@@ -116,6 +136,13 @@ def photon_transfer(
     The result has one fewer element along `axis` than the input,
     since it is defined for each pair of adjacent images.
 
+    A pixel at the top of the range of the analog-to-digital converter
+    has lost part of its noise,
+    so an image with more than `fraction_saturated` of its pixels there
+    raises an error.
+    A few such pixels, from cosmic rays or hot pixels, are rejected along
+    with the other spikes.
+
     Parameters
     ----------
     images
@@ -127,11 +154,18 @@ def photon_transfer(
         Pixels in the difference image further than this many standard
         deviations from the median are rejected, as in :func:`readout`,
         to remove cosmic rays.
+    fraction_saturated
+        The largest fraction of the pixels of an image which may be at the
+        top of the range of the analog-to-digital converter.
 
     Raises
     ------
     TypeError
         If `images` is not the images from each tap.
+    ValueError
+        If there are fewer than two images along `axis`,
+        or more than `fraction_saturated` of the pixels of an image are at
+        the top of the range of the analog-to-digital converter.
 
     Examples
     --------
@@ -166,9 +200,23 @@ def photon_transfer(
     if not isinstance(images, AbstractTapData):
         raise TypeError(_message_taps(images))
 
+    if _num(images, axis) < 2:
+        raise ValueError(_message_sequence(images, axis))
+
     num_masked = images.camera.sensor.num_masked
-    outputs = images.unbiased.active.outputs
-    outputs = outputs[{images.axis_y: slice(num_masked, None)}]
+    rows = {images.axis_y: slice(num_masked, None)}
+
+    bits = images.camera.bits_adc
+    ceiling = (2**bits - 1) * u.DN
+    saturated = (images.active.outputs[rows] >= ceiling).mean(images.axis_xy)
+    if np.any(saturated > fraction_saturated):
+        raise ValueError(
+            f"{100 * saturated.max().ndarray:.2g} percent of the pixels of an image "
+            f"are at the top of the range of the {bits}-bit analog-to-digital "
+            "converter, more than `fraction_saturated`."
+        )
+
+    outputs = images.unbiased.active.outputs[rows]
     outputs_1 = outputs[{axis: slice(1, None)}]
     outputs_0 = outputs[{axis: slice(None, -1)}]
 

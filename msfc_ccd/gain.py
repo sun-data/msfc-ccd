@@ -8,10 +8,11 @@ and :func:`photon_transfer` a sequence of flats.
 import dataclasses
 import numpy as np
 import astropy.units as u
-import named_arrays as na
 from ._fe55 import Fe55, _fit_gain
 from ._images.abc import AbstractTapData
-from ._measurements import TapDataT, _message_taps, _variance_difference
+from ._measurements import TapDataT, _axes_pixel, _fit_taps, _message_taps
+from ._measurements import _message_sequence, _num
+from ._measurements import _variance_difference
 from . import noise
 
 __all__ = [
@@ -72,6 +73,8 @@ def fe55(
     ------
     TypeError
         If `images` is not the images from each tap.
+    ValueError
+        If `gain_min` is not smaller than `gain_max`.
 
     Examples
     --------
@@ -88,38 +91,34 @@ def fe55(
     if not isinstance(images, AbstractTapData):
         raise TypeError(_message_taps(images))
 
+    if gain_min >= gain_max:
+        raise ValueError(
+            f"`gain_min`, {gain_min}, must be smaller than `gain_max`, {gain_max}."
+        )
+
     if source is None:
         source = Fe55()
 
-    hits = images.hits(threshold)
+    charge = images.hits(threshold).outputs
 
     unit = u.electron / u.DN
     gain_min = gain_min.to_value(unit)
     gain_max = gain_max.to_value(unit)
 
-    charge = hits.outputs
-    axes = tuple(charge.shape)
-    axes_tap = (images.axis_tap_y, images.axis_tap_x)
-    axes_tap = tuple(a for a in axes_tap if a in axes)
-    axes_pooled = tuple(a for a in axes if a not in axes_tap)
+    def fit(charge: np.ndarray) -> tuple[float]:
+        return (_fit_gain(charge, gain_min, gain_max, source),)
 
-    shape_tap = tuple(charge.shape[a] for a in axes_tap)
-    ndarray = charge.ndarray_aligned(axes_tap + axes_pooled)
-    ndarray = ndarray.to_value(u.DN).reshape(shape_tap + (-1,))
-
-    result = np.empty(shape_tap)
-    for index in np.ndindex(*shape_tap):
-        result[index] = _fit_gain(
-            charge=ndarray[index],
-            gain_min=gain_min,
-            gain_max=gain_max,
-            fe55=source,
-        )
+    (gain,), axes_pooled = _fit_taps(
+        images=images,
+        fit=fit,
+        num=1,
+        charge=charge.to(u.DN).value,
+    )
 
     return dataclasses.replace(
         images,
         inputs=images.inputs[{a: 0 for a in axes_pooled}],
-        outputs=na.ScalarArray(result * unit, axes=axes_tap),
+        outputs=gain * unit,
     )
 
 
@@ -127,6 +126,8 @@ def photon_transfer(
     images: TapDataT,
     axis: str,
     threshold: float = 5,
+    signal_min: u.Quantity = 100 * u.DN,
+    fraction_saturated: float = 0.001,
 ) -> TapDataT:
     r"""
     Measure the gain of each tap from a sequence of flat images.
@@ -140,6 +141,10 @@ def photon_transfer(
 
     pooled over every axis except the two tap axes,
     so pairs of flats at several levels of illumination can be combined.
+    A pair of images whose signal is below `signal_min` cannot be a pair
+    of flats, and raises an error,
+    as do flats which have no shot noise left after the readout noise is
+    removed.
     The readout noise, :math:`\sigma_r`, is measured from the blank columns
     of the same pairs of images, where there is no shot noise,
     so it follows any change in the noise of the camera during the test.
@@ -165,6 +170,11 @@ def photon_transfer(
     threshold
         Pixels in the difference images further than this many standard
         deviations from the median are rejected, to remove cosmic rays.
+    signal_min
+        The smallest signal of a pair of images which is accepted as a pair
+        of flats.
+    fraction_saturated
+        Passed to :func:`msfc_ccd.noise.photon_transfer`.
 
     Returns
     -------
@@ -175,6 +185,13 @@ def photon_transfer(
     ------
     TypeError
         If `images` is not the images from each tap.
+    ValueError
+        If there are fewer than two images along `axis`,
+        a pair of them has a signal below `signal_min`,
+        the flats have no shot noise left after the readout noise is
+        removed,
+        or :func:`msfc_ccd.noise.photon_transfer` finds too many
+        saturated pixels.
 
     Examples
     --------
@@ -203,7 +220,16 @@ def photon_transfer(
     if not isinstance(images, AbstractTapData):
         raise TypeError(_message_taps(images))
 
-    ptc = noise.photon_transfer(images, axis, threshold)
+    if _num(images, axis) < 2:
+        raise ValueError(_message_sequence(images, axis))
+
+    ptc = noise.photon_transfer(images, axis, threshold, fraction_saturated)
+
+    if np.any(ptc.inputs < signal_min):
+        raise ValueError(
+            f"A pair of images has a mean signal of {ptc.inputs.min().ndarray:.1f}, "
+            "below `signal_min`, so it is not a pair of flats."
+        )
 
     outputs = images.outputs
     outputs = outputs[{images.axis_x: images.where_blank(num=25)}]
@@ -221,8 +247,14 @@ def photon_transfer(
     signal = ptc.inputs.sum(axes_pooled)
     variance = (ptc.outputs - variance_readout).sum(axes_pooled)
 
+    if np.any(variance <= 0):
+        raise ValueError(
+            "The flats have no shot noise left after the readout noise is "
+            "removed, so they cannot measure the gain."
+        )
+
     return dataclasses.replace(
         images,
-        inputs=images.inputs[{a: 0 for a in axes_pooled}],
+        inputs=images.inputs[{a: 0 for a in axes_pooled} | _axes_pixel(images)],
         outputs=(u.electron * signal / variance).to(u.electron / u.DN),
     )

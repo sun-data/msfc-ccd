@@ -7,9 +7,10 @@ and :func:`current` needs them at a range of exposure lengths.
 
 import dataclasses
 import numpy as np
+import astropy.units as u
 import named_arrays as na
 from ._images.abc import AbstractTapData
-from ._measurements import CameraDataT, TapDataT, _message_taps
+from ._measurements import CameraDataT, TapDataT, _axes_pixel, _message_taps
 
 __all__ = [
     "master",
@@ -54,7 +55,15 @@ def master(
     -------
     A copy of `images`, of the same type, whose outputs are the master dark,
     without `axis`.
+
+    Raises
+    ------
+    ValueError
+        If the images have no axis `axis`.
     """
+    if axis not in images.shape:
+        raise ValueError(f"`images` has no axis {axis!r} to average along.")
+
     outputs = na.mean_trimmed(
         a=images.outputs,
         q=proportion,
@@ -71,6 +80,7 @@ def current(
     images: TapDataT,
     axis: str,
     proportion: float = 0.01,
+    signal_max: u.Quantity = 100 * u.DN,
 ) -> TapDataT:
     """
     Estimate the dark current rate of each tap.
@@ -102,6 +112,11 @@ def current(
     so it is only measurable after averaging over all the active pixels,
     and a long exposure is needed to separate it from the bias.
 
+    Images which all requested the same exposure length have no slope to
+    fit, and raise an error.
+    An image whose signal is above `signal_max` cannot be a dark,
+    and raises an error too.
+
     Parameters
     ----------
     images
@@ -120,6 +135,8 @@ def current(
         proportion from 0 to 0.05.
         Trimming much harder removes the hot pixels too,
         which are part of the dark current.
+    signal_max
+        The largest signal of an image which is accepted as a dark.
 
     Returns
     -------
@@ -130,6 +147,10 @@ def current(
     ------
     TypeError
         If `images` is not the images from each tap.
+    ValueError
+        If the images did not request at least two different exposure
+        lengths along `axis`, or one of them has a signal above
+        `signal_max`.
 
     Examples
     --------
@@ -166,6 +187,15 @@ def current(
     if not isinstance(images, AbstractTapData):
         raise TypeError(_message_taps(images))
 
+    requested = na.as_named_array(images.inputs.timedelta_requested)
+    if axis not in requested.shape or np.any(
+        requested.max(axis) == requested.min(axis)
+    ):
+        raise ValueError(
+            "the dark current needs darks which requested at least two "
+            f"different exposure lengths along {axis!r}"
+        )
+
     num_masked = images.camera.sensor.num_masked
     signal = images.unbiased.active.outputs
     signal = signal[{images.axis_y: slice(num_masked, None)}]
@@ -176,6 +206,12 @@ def current(
     )
     timedelta = images.inputs.timedelta
 
+    if np.any(signal > signal_max):
+        raise ValueError(
+            f"An image has a signal of {signal.max().ndarray:.1f}, "
+            "above `signal_max`, so it is not a dark."
+        )
+
     signal = signal - signal.mean(axis)
     timedelta = timedelta - timedelta.mean(axis)
 
@@ -183,6 +219,6 @@ def current(
 
     return dataclasses.replace(
         images,
-        inputs=images.inputs[{axis: 0}],
+        inputs=images.inputs[{axis: 0, **_axes_pixel(images)}],
         outputs=rate,
     )

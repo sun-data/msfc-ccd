@@ -94,17 +94,21 @@ such as :attr:`~msfc_ccd.abc.AbstractTapData.unbiased` and
 :meth:`~msfc_ccd.abc.AbstractTapData.hits`, make sense for any image.
 Measuring a property of the camera needs a particular kind of exposure,
 such as a sequence of darks, a pair of flats or an Fe 55 exposure,
-and gives a wrong answer rather than an error on any other kind,
 so those measurements are functions instead,
 grouped by the quantity they measure into :mod:`msfc_ccd.noise`,
 :mod:`msfc_ccd.dark`, :mod:`msfc_ccd.gain` and :mod:`msfc_ccd.cte`.
+The measurements check the signal of their images, and raise a
+:class:`ValueError` rather than return a number when the images are clearly
+the wrong kind, such as a dark passed to :func:`msfc_ccd.cte.eper`.
+Only the :math:`^{55}\text{Fe}` measurements return :obj:`numpy.nan`,
+for a tap with too few events to fit.
 
 **Readout noise comes from a sequence of darks.**
 Differencing two adjacent dark images cancels the bias, the dark current and
 the fixed pattern of the sensor, leaving only the readout noise of the two
 frames, so :func:`msfc_ccd.noise.readout` estimates it
-from the active pixels of each difference rather than from the columns at the
-edge of a single frame.
+from the active pixels of each difference outside the masked rows,
+rather than from the columns at the edge of a single frame.
 
 **Dark current needs a range of exposure lengths.**
 A two-second dark accumulates less than a tenth of a data number of dark
