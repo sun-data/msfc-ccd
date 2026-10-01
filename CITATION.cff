@@ -1,0 +1,35 @@
+cff-version: 1.2.0
+message: "If you use msfc-ccd in your research, please cite it using these metadata."
+type: software
+title: msfc-ccd
+abstract: >-
+  msfc-ccd is a Python library for characterizing and using the CCD cameras
+  built by NASA Marshall Space Flight Center (MSFC) for solar instruments
+  flown on sounding rockets, such as the EUV Snapshot Imaging Spectrograph
+  (ESIS). It reads the FITS files that the cameras produce, models the camera
+  and its Teledyne/e2v CCD230-42 sensor, and turns a raw readout into a
+  calibrated image by splitting it into the four taps of the sensor, removing
+  the bias measured from the blank columns, and converting to electrons. The
+  library also measures the properties of each tap from calibration
+  exposures: readout noise from sequences of darks, dark current from darks
+  of several exposure lengths, gain from the photon transfer of flats and
+  from Fe 55 X-ray events, and charge transfer efficiency from the extended
+  pixel edge response of flats and from Fe 55 events. It is built on
+  named-arrays, so images and sequences of images carry named axes and
+  physical units.
+authors:
+  - family-names: Smart
+    given-names: Roy T.
+    orcid: "https://orcid.org/0000-0002-9997-5515"
+  - family-names: Parker
+    given-names: Jacob D.
+    orcid: "https://orcid.org/0000-0001-8732-8284"
+repository-code: "https://github.com/sun-data/msfc-ccd"
+url: "https://msfc-ccd.readthedocs.io"
+license: BSD-3-Clause
+keywords:
+  - CCD
+  - camera calibration
+  - image sensor
+  - sounding rockets
+  - solar physics
