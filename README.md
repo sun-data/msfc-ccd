@@ -154,6 +154,23 @@ charge transfer: 99.9995 %
 dark current:    1.039 electron / s at 263 K
 ```
 
+## Citation
+
+If you use msfc-ccd in your research, please cite it.
+The citation metadata is kept in [`CITATION.cff`](https://github.com/sun-data/msfc-ccd/blob/main/CITATION.cff),
+which the "Cite this repository" button on GitHub can export as BibTeX or APA.
+Please include the version of msfc-ccd that you used,
+which is given by `importlib.metadata.version("msfc-ccd")`.
+
+```bibtex
+@software{msfc-ccd,
+  author = {Smart, Roy T. and Parker, Jacob D.},
+  title = {msfc-ccd},
+  version = {X.Y.Z},
+  url = {https://github.com/sun-data/msfc-ccd},
+}
+```
+
 ## Development
 
 Install the package in editable mode along with its test dependencies, and run the test suite using [pytest](https://docs.pytest.org):

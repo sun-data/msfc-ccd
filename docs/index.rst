@@ -342,6 +342,30 @@ Inspect the sensor model that the calibration steps rely on.
 |
 
 
+Citation
+========
+
+If you use :mod:`msfc_ccd` in your research, please cite it.
+The citation metadata is kept in
+`CITATION.cff <https://github.com/sun-data/msfc-ccd/blob/main/CITATION.cff>`_,
+which the "Cite this repository" button on the
+`GitHub page <https://github.com/sun-data/msfc-ccd>`_
+can export as BibTeX or APA.
+Please include the version of :mod:`msfc_ccd` that you used,
+which is given by ``importlib.metadata.version("msfc-ccd")``.
+
+.. code-block:: bibtex
+
+    @software{msfc-ccd,
+      author = {Smart, Roy T. and Parker, Jacob D.},
+      title = {msfc-ccd},
+      version = {X.Y.Z},
+      url = {https://github.com/sun-data/msfc-ccd},
+    }
+
+|
+
+
 API Reference
 =============
 
