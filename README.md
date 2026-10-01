@@ -5,6 +5,7 @@
 [![Ruff](https://github.com/sun-data/msfc-ccd/actions/workflows/ruff.yml/badge.svg)](https://github.com/sun-data/msfc-ccd/actions/workflows/ruff.yml)
 [![Documentation Status](https://readthedocs.org/projects/msfc-ccd/badge/?version=latest)](https://msfc-ccd.readthedocs.io/en/latest/?badge=latest)
 [![PyPI version](https://badge.fury.io/py/msfc-ccd.svg)](https://badge.fury.io/py/msfc-ccd)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23090943.svg)](https://doi.org/10.5281/zenodo.23090943)
 
 A Python library for characterizing and using the CCD cameras developed by Marshall Space Flight Center.
 
@@ -159,14 +160,23 @@ dark current:    1.039 electron / s at 263 K
 If you use msfc-ccd in your research, please cite it.
 The citation metadata is kept in [`CITATION.cff`](https://github.com/sun-data/msfc-ccd/blob/main/CITATION.cff),
 which the "Cite this repository" button on GitHub can export as BibTeX or APA.
+
+Every release of msfc-ccd is archived on Zenodo with its own DOI.
+The concept DOI, [10.5281/zenodo.23090943](https://doi.org/10.5281/zenodo.23090943),
+always resolves to the latest version,
+and the Zenodo page lists the DOI of every version.
 Please include the version of msfc-ccd that you used,
 which is given by `importlib.metadata.version("msfc-ccd")`.
+The BibTeX entry below uses the concept DOI.
+To cite a specific version instead,
+replace `doi` with the DOI of that version.
 
 ```bibtex
 @software{msfc-ccd,
   author = {Smart, Roy T. and Parker, Jacob D.},
   title = {msfc-ccd},
   version = {X.Y.Z},
+  doi = {10.5281/zenodo.23090943},
   url = {https://github.com/sun-data/msfc-ccd},
 }
 ```

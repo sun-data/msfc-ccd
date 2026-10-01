@@ -27,6 +27,10 @@ authors:
 repository-code: "https://github.com/sun-data/msfc-ccd"
 url: "https://msfc-ccd.readthedocs.io"
 license: BSD-3-Clause
+identifiers:
+  - type: doi
+    description: Concept DOI, which always resolves to the latest version
+    value: "10.5281/zenodo.23090943"
 keywords:
   - CCD
   - camera calibration
