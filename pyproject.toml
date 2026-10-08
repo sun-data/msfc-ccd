@@ -18,7 +18,7 @@ classifiers = [
 dependencies = [
     "astropy",
     "named-arrays~=2.0",
-    "optika~=2.0",
+    "optika>=2.0,<4",
 ]
 dynamic = ["version"]
 
