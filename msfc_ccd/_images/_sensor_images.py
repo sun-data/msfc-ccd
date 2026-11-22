@@ -195,7 +195,11 @@ class SensorData(
             data[index] = data_index
 
             header = hdu.header
-            time_start[index] = astropy.time.Time(header["IMG_TS"]).jd
+            # Without a format, astropy guesses it by trying each in turn and
+            # catching the errors, whose tracebacks form reference cycles that
+            # keep this frame, and so `data`, alive until the garbage
+            # collector next runs, long after this method returns.
+            time_start[index] = astropy.time.Time(header["IMG_TS"], format="isot").jd
             timedelta[index] = header["MEAS_EXP"]
             timedelta_requested[index] = header["IMG_EXP"] * u.ms
             serial_number[index] = header.get("CAM_SN")

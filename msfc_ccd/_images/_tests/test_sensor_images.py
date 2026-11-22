@@ -1,3 +1,5 @@
+import gc
+import weakref
 import pytest
 import numpy as np
 import astropy.units as u
@@ -86,3 +88,29 @@ class TestSensorData(
         c = a.from_taps(b)
 
         assert np.all(a == c)
+
+
+def test_from_fits_frees_buffer() -> None:
+    """
+    Check that the buffer the images are read into is freed with the result.
+
+    Nothing may keep it alive once the result is gone, not even reference
+    cycles waiting for the garbage collector.
+    """
+    path = na.ScalarArray(
+        ndarray=np.array(
+            [
+                msfc_ccd.samples.path_dark_esis1,
+                msfc_ccd.samples.path_fe55_esis1,
+            ]
+        ),
+        axes="time",
+    )
+    gc.disable()
+    try:
+        a = msfc_ccd.SensorData.from_fits(path=path, camera=_camera)
+        buffer = weakref.ref(a.outputs.ndarray.base)
+        del a
+        assert buffer() is None
+    finally:
+        gc.enable()
